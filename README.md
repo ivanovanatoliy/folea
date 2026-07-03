@@ -112,7 +112,9 @@ server such as Xvfb.
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+The repository is currently **read-only** — no external contributions are accepted while core
+features are being built. Issues and PRs will be ignored for now. This will change once the
+project reaches a stable baseline; the notice here will be updated accordingly.
 
 ## License
 
