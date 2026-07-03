@@ -1,0 +1,1 @@
+export { VaultIndex } from './model';

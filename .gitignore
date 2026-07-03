@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Build output
+dist/
+out/
+build/
+.vite/
+release/
+
+# Native module build artifacts
+*.node
+prebuilds/
+
+# Test / coverage
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+.playwright/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+.vscode/*
+!.vscode/extensions.json
+
+# Env / local
+.env
+.env.local
+*.local
+
+# Electron-builder
+dist_electron/

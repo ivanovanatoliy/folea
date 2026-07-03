@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "useUnknownInCatchVariables": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "types": ["vite/client"]
+  },
+  "include": [
+    "src/renderer/**/*.ts",
+    "src/renderer/**/*.tsx",
+    "src/shared/**/*.ts",
+    "src/workers/**/*.ts",
+    "src/workers/**/*.d.ts"
+  ]
+}

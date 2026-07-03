@@ -1,0 +1,102 @@
+folea
+Copyright 2026 folea contributors
+
+folea is licensed under the Apache License, Version 2.0. See LICENSE.
+
+Bundled / Redistributed Components
+==================================
+
+The installable folea application redistributes the components below.
+
+typst.ts WASM packages
+----------------------
+- @myriaddreamin/typst-ts-web-compiler 0.7.0
+- @myriaddreamin/typst-ts-renderer 0.7.0
+- License: Apache-2.0
+- Source: https://github.com/Myriad-Dreamin/typst.ts
+
+Electron runtime
+----------------
+- Electron
+- License: MIT
+- Source: https://github.com/electron/electron
+
+SolidJS runtime
+---------------
+- solid-js 1.9.13
+- License: MIT
+- Source: https://github.com/solidjs/solid
+
+- csstype 3.2.3
+- License: MIT
+- Source: https://github.com/frenic/csstype
+
+- seroval 1.5.4
+- License: MIT
+- Source: https://github.com/lxsmnsyc/seroval
+
+- seroval-plugins 1.5.4
+- License: MIT
+- Source: https://github.com/lxsmnsyc/seroval-plugins
+
+File watching
+-------------
+- chokidar 5.0.0
+- License: MIT
+- Source: https://github.com/paulmillr/chokidar
+
+- readdirp 5.0.0
+- License: MIT
+- Source: https://github.com/paulmillr/readdirp
+
+ripgrep search binary
+---------------------
+- @vscode/ripgrep wrapper package
+- License: MIT
+- Source: https://github.com/microsoft/vscode-ripgrep
+
+- @vscode/ripgrep-linux-x64 package
+- License: MIT
+- Source: https://github.com/microsoft/vscode-ripgrep
+
+- ripgrep binary
+- License: MIT OR Unlicense
+- Source: https://github.com/BurntSushi/ripgrep
+
+Embedded fonts
+--------------
+folea embeds the font files under src/workers/typst-compile/assets/ so Typst notes render
+deterministically without network font loading.
+
+- NotoSerif-Regular.ttf
+  Family: Noto Serif
+  License: SIL Open Font License 1.1
+  Source: https://github.com/notofonts/noto-fonts
+
+- LibertinusSerif-Regular.otf
+- LibertinusSerif-Bold.otf
+- LibertinusSerif-Italic.otf
+- LibertinusSerif-BoldItalic.otf
+- LibertinusMath-Regular.otf
+  Family: Libertinus
+  License: SIL Open Font License 1.1
+  Source: https://github.com/alerque/libertinus
+
+- NewCM10-Regular.otf
+- NewCM10-Bold.otf
+- NewCM10-Italic.otf
+- NewCM10-BoldItalic.otf
+- NewCMMath-Regular.otf
+  Family: New Computer Modern / NewCM
+  License: GUST Font License
+  Source: https://github.com/ustctug/newcomputermodern
+
+Runtime Dependencies (Not Bundled)
+==================================
+
+folea can launch the following user-installed tools for the edit workflow, but it does not
+redistribute them:
+
+- Neovim — Apache-2.0 and Vim license for portions — https://github.com/neovim/neovim
+- tinymist — Apache-2.0 — https://github.com/Myriad-Dreamin/tinymist
+- typst-preview.nvim — MIT — https://github.com/chomosuke/typst-preview.nvim

@@ -1,0 +1,102 @@
+{
+  "name": "folea",
+  "version": "0.0.0",
+  "description": "Keyboard-driven minimalist note manager for Typst notes.",
+  "main": "out/main/index.js",
+  "private": true,
+  "license": "Apache-2.0",
+  "desktopName": "folea",
+  "author": {
+    "name": "folea contributors",
+    "email": "maintainers@folea.dev"
+  },
+  "build": {
+    "appId": "dev.folea.app",
+    "productName": "folea",
+    "copyright": "Copyright © 2026 folea contributors",
+    "files": [
+      "out/**",
+      "build/icon.svg",
+      "build/icon.png",
+      "package.json",
+      "LICENSE",
+      "NOTICE"
+    ],
+    "asarUnpack": [
+      "node_modules/@vscode/ripgrep-*/bin/**"
+    ],
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "build/icon.png"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.png"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "build/icon.png",
+      "category": "Utility",
+      "maintainer": "folea contributors <maintainers@folea.dev>",
+      "syncDesktopName": true
+    }
+  },
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "npm run typecheck && electron-vite build",
+    "package": "npm run build && electron-builder --publish never",
+    "package:dir": "npm run build && electron-builder --dir --publish never",
+    "package:linux:appimage": "npm run build && electron-builder --linux AppImage --publish never",
+    "package:all": "npm run build && electron-builder --linux AppImage deb --win nsis --mac dmg zip --publish never",
+    "install:unpacked": "npm run package:dir && node scripts/install-unpacked.mjs",
+    "uninstall:unpacked": "node scripts/uninstall-unpacked.mjs",
+    "install:appimage": "npm run package:linux:appimage && node scripts/install-appimage-linux.mjs",
+    "uninstall:appimage": "node scripts/uninstall-appimage-linux.mjs",
+    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\" \"*.config.ts\"",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "test": "vitest run",
+    "test:e2e": "npm run build && playwright test",
+    "rebuild": "electron-rebuild",
+    "measure:cold-start": "npm run build && node scripts/measure-cold-start.mjs",
+    "measure:warm-open": "npm run build && node scripts/measure-warm-open.mjs",
+    "measure:input-to-paint": "npm run build && node scripts/measure-input-to-paint.mjs",
+    "measure:graph-build": "npm run build && node scripts/measure-graph-build.mjs"
+  },
+  "dependencies": {
+    "@myriaddreamin/typst-ts-renderer": "0.7.0",
+    "@myriaddreamin/typst-ts-web-compiler": "0.7.0",
+    "@vscode/ripgrep": "^1.18.0",
+    "chokidar": "^5.0.0",
+    "solid-js": "^1.9.13"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.4",
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.61.0",
+    "@types/node": "^26.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.61.1",
+    "@typescript-eslint/parser": "^8.61.1",
+    "electron": "^42.4.1",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "eslint": "^10.5.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.6.0",
+    "playwright": "^1.61.0",
+    "prettier": "^3.8.4",
+    "typescript": "^6.0.3",
+    "vite": "^5.4.21",
+    "vite-plugin-solid": "^2.11.12",
+    "vitest": "^4.1.9"
+  }
+}
