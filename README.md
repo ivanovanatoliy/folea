@@ -13,6 +13,14 @@ search, jump, browse links, and read rendered Typst.
 folea **does not edit notes in-app**. The `editor.open` command (`<C-e>` by default) launches the
 user's external terminal/editor command, normally Neovim with tinymist.
 
+## Screenshots
+
+![Home screen](assets/screenshots/home.png)
+
+![Command palette](assets/screenshots/palette.png)
+
+![Editor split view](assets/screenshots/editor.png)
+
 ## Install
 
 M10 packages are unsigned. Build artifacts are produced with `electron-builder`:
@@ -109,6 +117,54 @@ npm run rebuild
 
 `npm run test:e2e` launches Electron through Playwright. On headless Linux, run it under a display
 server such as Xvfb.
+
+## Key Bindings
+
+All bindings are remappable via `keys.config`. The command ID shown in the palette is the
+key used for remapping.
+
+### Document (reading mode)
+
+| Key | Action |
+|---|---|
+| `j` / `k` | Scroll down / up |
+| `h` / `l` | Scroll left / right |
+| `Ctrl+d` / `Ctrl+u` | Scroll half page down / up |
+| `gg` / `G` | Jump to top / bottom |
+| `n` / `N` | Next / previous search match |
+| `:` | Command palette |
+| `/` | In-file search |
+| `Ctrl+p` | Quick open note |
+| `Ctrl+b` | Toggle file tree |
+| `o` | Document outline |
+| `b` | Links panel |
+| `s` | Enter caret mode |
+| `Ctrl+e` | Open current note in editor |
+| `=` | Fit page width |
+| `+` / `-` | Zoom in / out |
+
+### File tree
+
+| Key | Action |
+|---|---|
+| `j` / `k` | Move down / up |
+| `l` / `h` | Expand / collapse |
+| `gg` / `G` | First / last item |
+| `/` | Filter tree |
+| `Enter` | Open selected note |
+
+### Caret mode (`s` to enter)
+
+| Key | Action |
+|---|---|
+| `h` / `j` / `k` / `l` | Move caret |
+| `{` / `}` | Previous / next paragraph |
+| `gg` / `G` | Document start / end |
+| `v` | Enter visual selection |
+| `y` | Yank selection (in visual mode) |
+| `Enter` / `gd` | Follow link under caret |
+| `m<x>` | Set mark `x` |
+| `'<x>` | Jump to mark `x` |
 
 ## Contributing
 
