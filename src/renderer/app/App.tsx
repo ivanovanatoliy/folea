@@ -397,12 +397,12 @@ export const App = () => {
     setConfigWarnings((current) => [...current, ...loadedPrefs.warnings]);
   };
 
-  const setVaultTheme = async (theme: FoleaThemePreference): Promise<void> => {
+  const setThemePreference = async (theme: FoleaThemePreference): Promise<void> => {
     try {
       applyLoadedPrefs(await window.folea.prefs.setTheme(theme));
     } catch (error) {
-      console.debug('Unable to set vault theme', error);
-      setConfigWarnings((current) => [...current, 'prefs.config: unable to save vault theme']);
+      console.debug('Unable to set theme', error);
+      setConfigWarnings((current) => [...current, 'prefs.config: unable to save theme']);
     }
   };
 
@@ -742,6 +742,7 @@ export const App = () => {
     setRecentNotes([]);
     setCommandHistory([]);
     setStartupState('start-menu');
+    void window.folea.prefs.load().then(applyLoadedPrefs).catch(() => {});
     window.folea.appState.load().then((s) => setRecentVaults(s.recentVaults)).catch(() => {});
   };
 
@@ -1280,13 +1281,13 @@ export const App = () => {
     };
 
     const themeView: ThemeView = {
-      useSystem: () => setVaultTheme('system'),
-      useLight: () => setVaultTheme('light'),
-      useDark: () => setVaultTheme('dark'),
+      useSystem: () => setThemePreference('system'),
+      useLight: () => setThemePreference('light'),
+      useDark: () => setThemePreference('dark'),
       cycle: () => {
         const next: FoleaThemePreference =
           prefs().theme === 'system' ? 'light' : prefs().theme === 'light' ? 'dark' : 'system';
-        return setVaultTheme(next);
+        return setThemePreference(next);
       }
     };
 

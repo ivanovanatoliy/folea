@@ -611,8 +611,11 @@ test('loads theme and key remaps from config files', async () => {
       .poll(() => page.evaluate(() => window.folea.prefs.load().then((prefs) => prefs.theme)))
       .toBe('light');
     await expect
-      .poll(() => fs.readFile(path.join(userDataRoot, 'prefs.config'), 'utf8'))
+      .poll(() => fs.readFile(path.join(vaultRoot, '.folea', 'prefs.config'), 'utf8'))
       .toBe('theme = light\n');
+    await expect.poll(() => fs.readFile(path.join(userDataRoot, 'prefs.config'), 'utf8')).toBe(
+      'theme = dark\n'
+    );
   } finally {
     await fs.rm(vaultRoot, { recursive: true, force: true });
     await fs.rm(userDataRoot, { recursive: true, force: true });
