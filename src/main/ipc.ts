@@ -63,7 +63,7 @@ import { installBoundedShutdown } from './shutdown';
 import { vaultService } from './vault/service';
 import { loadAppState, updateAppState } from './app-state';
 import { VaultStateManager } from './vault-state';
-import { loadKeysConfigContent, loadResolvedPrefs, setGlobalThemePreference } from './config';
+import { loadKeysConfigContent, loadResolvedPrefs, setScopedThemePreference } from './config';
 
 let vaultBroadcastUnsubscribe: (() => void) | undefined;
 let cleanupRegistered = false;
@@ -288,7 +288,7 @@ export const registerIpcHandlers = (): void => {
     const theme = parseFoleaThemePreference(request);
     const vaultRoot = vaultService.getOpenRoot()?.realRoot;
 
-    return parseFoleaPrefs(await setGlobalThemePreference(theme, vaultRoot));
+    return parseFoleaPrefs(await setScopedThemePreference(theme, vaultRoot));
   });
 
   ipcMain.removeHandler(KEYS_CONFIG_LOAD_CHANNEL);

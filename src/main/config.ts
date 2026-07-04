@@ -111,10 +111,13 @@ const setThemePreference = async (
   await fs.writeFile(prefsPath, `${nextLines.join('\n').replace(/\n+$/, '')}\n`, 'utf8');
 };
 
-export const setGlobalThemePreference = async (
+export const setScopedThemePreference = async (
   theme: FoleaThemePreference,
   vaultRoot?: string
 ): Promise<FoleaPrefs> => {
-  await setThemePreference(path.join(getGlobalConfigDir(), PREFS_FILE), theme);
+  const prefsPath = vaultRoot
+    ? path.join(vaultRoot, FOLEA_DIR, PREFS_FILE)
+    : path.join(getGlobalConfigDir(), PREFS_FILE);
+  await setThemePreference(prefsPath, theme);
   return loadResolvedPrefs(vaultRoot);
 };
