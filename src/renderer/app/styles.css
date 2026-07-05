@@ -530,7 +530,7 @@ body {
 
 .statusline-zoom {
 	transform: translateY(2px);
-  color: var(--fole-text);
+  color: var(--folea-text);
 }
 
 .statusline-warning {
