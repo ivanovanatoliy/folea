@@ -7,7 +7,11 @@ import {
 
 describe('parseAppStateFileV1', () => {
   it('parses a valid state with null vault path', () => {
-    const input = { schemaVersion: 1, updatedAt: '2026-01-01T00:00:00Z', lastOpenedVaultPath: null };
+    const input = {
+      schemaVersion: 1,
+      updatedAt: '2026-01-01T00:00:00Z',
+      lastOpenedVaultPath: null
+    };
     const result = parseAppStateFileV1(input);
     expect(result.schemaVersion).toBe(1);
     expect(result.lastOpenedVaultPath).toBeNull();
@@ -27,14 +31,20 @@ describe('parseAppStateFileV1', () => {
   });
 
   it('defaults recentVaults to [] when missing (backward compat)', () => {
-    const input = { schemaVersion: 1, updatedAt: '2026-01-01T00:00:00Z', lastOpenedVaultPath: null };
+    const input = {
+      schemaVersion: 1,
+      updatedAt: '2026-01-01T00:00:00Z',
+      lastOpenedVaultPath: null
+    };
     const result = parseAppStateFileV1(input);
     expect(result.recentVaults).toEqual([]);
   });
 
   it('filters non-string entries from recentVaults', () => {
     const input = {
-      schemaVersion: 1, updatedAt: '2026-01-01T00:00:00Z', lastOpenedVaultPath: null,
+      schemaVersion: 1,
+      updatedAt: '2026-01-01T00:00:00Z',
+      lastOpenedVaultPath: null,
       recentVaults: ['/valid/path', 42, null, '/another/path']
     };
     const result = parseAppStateFileV1(input);
@@ -43,19 +53,27 @@ describe('parseAppStateFileV1', () => {
 
   it('throws for wrong schema version', () => {
     expect(() =>
-      parseAppStateFileV1({ schemaVersion: 2, updatedAt: '2026-01-01T00:00:00Z', lastOpenedVaultPath: null })
+      parseAppStateFileV1({
+        schemaVersion: 2,
+        updatedAt: '2026-01-01T00:00:00Z',
+        lastOpenedVaultPath: null
+      })
     ).toThrow(TypeError);
   });
 
   it('throws for missing updatedAt', () => {
-    expect(() =>
-      parseAppStateFileV1({ schemaVersion: 1, lastOpenedVaultPath: null })
-    ).toThrow(TypeError);
+    expect(() => parseAppStateFileV1({ schemaVersion: 1, lastOpenedVaultPath: null })).toThrow(
+      TypeError
+    );
   });
 
   it('throws for invalid lastOpenedVaultPath type', () => {
     expect(() =>
-      parseAppStateFileV1({ schemaVersion: 1, updatedAt: '2026-01-01T00:00:00Z', lastOpenedVaultPath: 42 })
+      parseAppStateFileV1({
+        schemaVersion: 1,
+        updatedAt: '2026-01-01T00:00:00Z',
+        lastOpenedVaultPath: 42
+      })
     ).toThrow(TypeError);
   });
 

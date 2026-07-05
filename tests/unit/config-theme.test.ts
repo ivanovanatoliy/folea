@@ -18,7 +18,9 @@ describe('setScopedThemePreference', () => {
     delete process.env.FOLEA_TEST_USER_DATA_DIR;
     delete process.env.FOLEA_ALLOW_TEST_VAULT_OPEN;
 
-    await Promise.all(tempRoots.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
+    await Promise.all(
+      tempRoots.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true }))
+    );
   });
 
   it('writes the global prefs when no vault is open', async () => {

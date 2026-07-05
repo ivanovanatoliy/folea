@@ -38,13 +38,22 @@ describe('applyVaultStatePatch — noteOpened', () => {
   it('deduplicates — moves existing entry to front', () => {
     let state = defaultVaultState();
     state = applyVaultStatePatch(state, {
-      type: 'noteOpened', relPath: 'a.typ', title: 'A', openedAt: '2026-01-01T00:00:00Z'
+      type: 'noteOpened',
+      relPath: 'a.typ',
+      title: 'A',
+      openedAt: '2026-01-01T00:00:00Z'
     });
     state = applyVaultStatePatch(state, {
-      type: 'noteOpened', relPath: 'b.typ', title: 'B', openedAt: '2026-01-01T00:01:00Z'
+      type: 'noteOpened',
+      relPath: 'b.typ',
+      title: 'B',
+      openedAt: '2026-01-01T00:01:00Z'
     });
     state = applyVaultStatePatch(state, {
-      type: 'noteOpened', relPath: 'a.typ', title: 'A', openedAt: '2026-01-01T00:02:00Z'
+      type: 'noteOpened',
+      relPath: 'a.typ',
+      title: 'A',
+      openedAt: '2026-01-01T00:02:00Z'
     });
 
     expect(state.recentNotes).toHaveLength(2);
@@ -161,14 +170,19 @@ describe('applyVaultStatePatch — removeMissingNotes', () => {
   it('removes deleted notes from recentNotes and positions', () => {
     let state = defaultVaultState();
     state = applyVaultStatePatch(state, {
-      type: 'noteOpened', relPath: 'a.typ', title: 'A', openedAt: '2026-01-01T00:00:00Z'
+      type: 'noteOpened',
+      relPath: 'a.typ',
+      title: 'A',
+      openedAt: '2026-01-01T00:00:00Z'
     });
     state = applyVaultStatePatch(state, {
-      type: 'positionChanged', position: makePosition('a.typ')
+      type: 'positionChanged',
+      position: makePosition('a.typ')
     });
 
     const result = applyVaultStatePatch(state, {
-      type: 'removeMissingNotes', relPaths: ['a.typ']
+      type: 'removeMissingNotes',
+      relPaths: ['a.typ']
     });
 
     expect(result.recentNotes).toHaveLength(0);
@@ -178,11 +192,15 @@ describe('applyVaultStatePatch — removeMissingNotes', () => {
   it('clears lastOpenedNote if it was deleted', () => {
     let state = defaultVaultState();
     state = applyVaultStatePatch(state, {
-      type: 'noteOpened', relPath: 'a.typ', title: 'A', openedAt: '2026-01-01T00:00:00Z'
+      type: 'noteOpened',
+      relPath: 'a.typ',
+      title: 'A',
+      openedAt: '2026-01-01T00:00:00Z'
     });
 
     const result = applyVaultStatePatch(state, {
-      type: 'removeMissingNotes', relPaths: ['a.typ']
+      type: 'removeMissingNotes',
+      relPaths: ['a.typ']
     });
 
     expect(result.lastOpenedNote).toBeNull();
@@ -191,14 +209,21 @@ describe('applyVaultStatePatch — removeMissingNotes', () => {
   it('keeps unrelated notes intact', () => {
     let state = defaultVaultState();
     state = applyVaultStatePatch(state, {
-      type: 'noteOpened', relPath: 'a.typ', title: 'A', openedAt: '2026-01-01T00:00:00Z'
+      type: 'noteOpened',
+      relPath: 'a.typ',
+      title: 'A',
+      openedAt: '2026-01-01T00:00:00Z'
     });
     state = applyVaultStatePatch(state, {
-      type: 'noteOpened', relPath: 'b.typ', title: 'B', openedAt: '2026-01-01T00:01:00Z'
+      type: 'noteOpened',
+      relPath: 'b.typ',
+      title: 'B',
+      openedAt: '2026-01-01T00:01:00Z'
     });
 
     const result = applyVaultStatePatch(state, {
-      type: 'removeMissingNotes', relPaths: ['a.typ']
+      type: 'removeMissingNotes',
+      relPaths: ['a.typ']
     });
 
     expect(result.recentNotes).toHaveLength(1);

@@ -12,13 +12,27 @@ import {
 } from '../../src/renderer/input';
 import type { CommandContext, LinksView } from '../../src/renderer/input';
 
-const makeLinksView = (): { view: LinksView; open: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn>; moveNext: ReturnType<typeof vi.fn>; movePrevious: ReturnType<typeof vi.fn>; accept: ReturnType<typeof vi.fn> } => {
+const makeLinksView = (): {
+  view: LinksView;
+  open: ReturnType<typeof vi.fn>;
+  close: ReturnType<typeof vi.fn>;
+  moveNext: ReturnType<typeof vi.fn>;
+  movePrevious: ReturnType<typeof vi.fn>;
+  accept: ReturnType<typeof vi.fn>;
+} => {
   const open = vi.fn();
   const close = vi.fn();
   const moveNext = vi.fn();
   const movePrevious = vi.fn();
   const accept = vi.fn();
-  return { view: { open, close, moveNext, movePrevious, accept }, open, close, moveNext, movePrevious, accept };
+  return {
+    view: { open, close, moveNext, movePrevious, accept },
+    open,
+    close,
+    moveNext,
+    movePrevious,
+    accept
+  };
 };
 
 const makeContext = (links: LinksView): CommandContext => ({
@@ -73,12 +87,54 @@ const makeContext = (links: LinksView): CommandContext => ({
     zoomIn: vi.fn(),
     zoomOut: vi.fn()
   },
-  outline: { open: vi.fn(), close: vi.fn(), moveNext: vi.fn(), movePrevious: vi.fn(), accept: vi.fn() },
+  outline: {
+    open: vi.fn(),
+    close: vi.fn(),
+    moveNext: vi.fn(),
+    movePrevious: vi.fn(),
+    accept: vi.fn()
+  },
   links,
-  palette: { open: vi.fn(), close: vi.fn(), moveNext: vi.fn(), movePrevious: vi.fn(), accept: vi.fn(), setQuery: vi.fn() },
-  search: { open: vi.fn(), openGlobal: vi.fn(), close: vi.fn(), moveNext: vi.fn(), movePrevious: vi.fn(), accept: vi.fn(), setQuery: vi.fn() },
-  tree: { moveDown: vi.fn(), moveUp: vi.fn(), collapse: vi.fn(), expand: vi.fn(), close: vi.fn(), openSearch: vi.fn(), closeSearch: vi.fn(), openSelection: vi.fn(), toggleOverlay: vi.fn(), selectFirst: vi.fn(), selectLast: vi.fn(), appendSearchChar: vi.fn(), backspaceSearch: vi.fn() },
-  quickOpen: { open: vi.fn(), close: vi.fn(), moveNext: vi.fn(), movePrevious: vi.fn(), accept: vi.fn(), setQuery: vi.fn() },
+  palette: {
+    open: vi.fn(),
+    close: vi.fn(),
+    moveNext: vi.fn(),
+    movePrevious: vi.fn(),
+    accept: vi.fn(),
+    setQuery: vi.fn()
+  },
+  search: {
+    open: vi.fn(),
+    openGlobal: vi.fn(),
+    close: vi.fn(),
+    moveNext: vi.fn(),
+    movePrevious: vi.fn(),
+    accept: vi.fn(),
+    setQuery: vi.fn()
+  },
+  tree: {
+    moveDown: vi.fn(),
+    moveUp: vi.fn(),
+    collapse: vi.fn(),
+    expand: vi.fn(),
+    close: vi.fn(),
+    openSearch: vi.fn(),
+    closeSearch: vi.fn(),
+    openSelection: vi.fn(),
+    toggleOverlay: vi.fn(),
+    selectFirst: vi.fn(),
+    selectLast: vi.fn(),
+    appendSearchChar: vi.fn(),
+    backspaceSearch: vi.fn()
+  },
+  quickOpen: {
+    open: vi.fn(),
+    close: vi.fn(),
+    moveNext: vi.fn(),
+    movePrevious: vi.fn(),
+    accept: vi.fn(),
+    setQuery: vi.fn()
+  },
   vault: { open: vi.fn(), close: vi.fn() }
 });
 

@@ -6,9 +6,7 @@ export interface FoleaShellBridge {
   openExternal(url: string): Promise<void>;
 }
 
-export const validateShellOpenExternalRequest = (
-  value: unknown
-): ShellOpenExternalRequest => {
+export const validateShellOpenExternalRequest = (value: unknown): ShellOpenExternalRequest => {
   if (
     typeof value !== 'object' ||
     value === null ||

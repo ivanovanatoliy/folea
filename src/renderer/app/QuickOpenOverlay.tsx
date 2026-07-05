@@ -35,7 +35,9 @@ export const QuickOpenOverlay = (props: QuickOpenOverlayProps) => {
     const selectedIndex = props.selectedIndex;
     queueMicrotask(() => {
       if (selectedIndex < 0) return;
-      results?.querySelector<HTMLElement>('[data-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+      results
+        ?.querySelector<HTMLElement>('[data-selected="true"]')
+        ?.scrollIntoView({ block: 'nearest' });
     });
   });
 
@@ -49,15 +51,19 @@ export const QuickOpenOverlay = (props: QuickOpenOverlayProps) => {
 
   return (
     <Show when={props.visible}>
-      <aside class="palette-overlay quick-open-overlay" data-testid="quick-open-overlay" aria-label="quick open">
+      <aside
+        class="palette-overlay quick-open-overlay"
+        data-testid="quick-open-overlay"
+        aria-label="quick open"
+      >
         <div class="palette-overlay-header">
           <span>{props.mode === 'recent' ? 'recent notes' : 'vault search'}</span>
-          <span>
-            {props.searching ? 'searching…' : rowCount()}
-          </span>
+          <span>{props.searching ? 'searching…' : rowCount()}</span>
         </div>
         <input
-          ref={(el) => { input = el; }}
+          ref={(el) => {
+            input = el;
+          }}
           class="palette-input"
           data-overlay-mode="quick-open"
           data-testid="quick-open-input"
@@ -67,7 +73,9 @@ export const QuickOpenOverlay = (props: QuickOpenOverlayProps) => {
           onInput={(event) => props.onInput(event.currentTarget.value)}
         />
         <div
-          ref={(el) => { results = el; }}
+          ref={(el) => {
+            results = el;
+          }}
           class="palette-results"
           data-testid="quick-open-results"
         >
@@ -101,7 +109,9 @@ export const QuickOpenOverlay = (props: QuickOpenOverlayProps) => {
                   onClick={() => props.onRowClick(index())}
                 >
                   <span class="palette-row-title">{hit.relPath}</span>
-                  <span class="search-row-meta">{hit.line}:{hit.column}</span>
+                  <span class="search-row-meta">
+                    {hit.line}:{hit.column}
+                  </span>
                   <span class="search-row-preview">{hit.preview}</span>
                 </div>
               )}

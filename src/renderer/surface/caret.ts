@@ -77,11 +77,9 @@ export const createCaretEngine = (
     }
   };
 
-  const charPosToTselIndex = (pos: number): number =>
-    _charPositions[pos]?.tselIndex ?? -1;
+  const charPosToTselIndex = (pos: number): number => _charPositions[pos]?.tselIndex ?? -1;
 
-  const tselIndexToFirstCharPos = (ti: number): number =>
-    _tselFirstCharPos[ti] ?? -1;
+  const tselIndexToFirstCharPos = (ti: number): number => _tselFirstCharPos[ti] ?? -1;
 
   const clampPos = (pos: number): number => {
     const maxPos = _charPositions.length - 1;
@@ -151,7 +149,10 @@ export const createCaretEngine = (
     const containerRect = container.getBoundingClientRect();
     if (rect.top >= containerRect.top && rect.bottom <= containerRect.bottom) return;
     scrollToOffset(
-      Math.max(0, rect.top - containerRect.top + container.scrollTop - container.clientHeight * 0.35)
+      Math.max(
+        0,
+        rect.top - containerRect.top + container.scrollTop - container.clientHeight * 0.35
+      )
     );
   };
 
@@ -423,7 +424,10 @@ export const createCaretEngine = (
       const paraStart = findParaStart(ti);
       if (paraStart < ti) {
         const pos = tselIndexToFirstCharPos(paraStart);
-        if (pos >= 0) { moveToPos(pos); return; }
+        if (pos >= 0) {
+          moveToPos(pos);
+          return;
+        }
       }
       if (paraStart > 0) {
         const prevParaStart = findParaStart(paraStart - 1);

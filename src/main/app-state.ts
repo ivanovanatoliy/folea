@@ -18,7 +18,10 @@ const getStatePath = (): string => path.join(app.getPath('userData'), STATE_FILE
 
 const atomicWriteJson = async (filePath: string, data: unknown): Promise<void> => {
   const dir = path.dirname(filePath);
-  const tmpPath = path.join(dir, `${path.basename(filePath)}.tmp-${process.pid}-${crypto.randomBytes(4).toString('hex')}`);
+  const tmpPath = path.join(
+    dir,
+    `${path.basename(filePath)}.tmp-${process.pid}-${crypto.randomBytes(4).toString('hex')}`
+  );
   const json = JSON.stringify(data, null, 2);
 
   try {

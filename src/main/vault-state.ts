@@ -201,10 +201,7 @@ export const applyVaultStatePatch = (
   }
 };
 
-export const saveVaultState = async (
-  vaultRoot: string,
-  state: VaultStateFileV1
-): Promise<void> => {
+export const saveVaultState = async (vaultRoot: string, state: VaultStateFileV1): Promise<void> => {
   await atomicWriteJson(getStateFilePath(vaultRoot), state);
 };
 
@@ -247,7 +244,8 @@ const loadManifest = async (vaultRoot: string): Promise<RenderCacheManifestV1> =
 
     return {
       schemaVersion: 1,
-      updatedAt: typeof rawRecord.updatedAt === 'string' ? rawRecord.updatedAt : new Date().toISOString(),
+      updatedAt:
+        typeof rawRecord.updatedAt === 'string' ? rawRecord.updatedAt : new Date().toISOString(),
       entries
     };
   } catch {
@@ -292,9 +290,7 @@ export const readRenderCache = async (
   request: ReadRenderCacheRequest
 ): Promise<ReadRenderCacheResponse> => {
   const manifest = await loadManifest(vaultRoot);
-  const candidates = Object.values(manifest.entries).filter(
-    (e) => e.relPath === request.relPath
-  );
+  const candidates = Object.values(manifest.entries).filter((e) => e.relPath === request.relPath);
 
   if (candidates.length === 0) {
     return { hit: false, reason: 'missing' };

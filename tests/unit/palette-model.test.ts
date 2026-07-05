@@ -36,9 +36,6 @@ describe('palette command filtering', () => {
 
   it('applies command history ordering after filtering by query', () => {
     const matches = filterPaletteCommands(commands, 'open', ['search.open']);
-    expect(matches.map((entry) => entry.command.id)).toEqual([
-      'search.open',
-      'document.outline'
-    ]);
+    expect(matches.map((entry) => entry.command.id)).toEqual(['search.open', 'document.outline']);
   });
 });

@@ -159,7 +159,11 @@ registerCommand({
   title: 'Open selected linked note',
   run: (ctx) => ctx.links.accept()
 });
-registerCommand({ id: 'caret.toggle', title: 'Toggle caret mode', run: (ctx) => ctx.caret.toggle() });
+registerCommand({
+  id: 'caret.toggle',
+  title: 'Toggle caret mode',
+  run: (ctx) => ctx.caret.toggle()
+});
 registerCommand({ id: 'caret.exit', title: 'Exit caret mode', run: (ctx) => ctx.caret.exit() });
 registerCommand({
   id: 'caret.moveDown',
@@ -288,7 +292,11 @@ registerCommand({
   run: (ctx) => ctx.caret.jumpParaBackward()
 });
 registerCommand({ id: 'visual.yank', title: 'Yank selection', run: (ctx) => ctx.caret.yank() });
-registerCommand({ id: 'visual.exit', title: 'Exit visual mode', run: (ctx) => ctx.caret.exitVisual() });
+registerCommand({
+  id: 'visual.exit',
+  title: 'Exit visual mode',
+  run: (ctx) => ctx.caret.exitVisual()
+});
 registerCommand({
   id: 'document.clearSearch',
   title: 'Clear search highlight',
@@ -298,9 +306,21 @@ registerCommand({ id: 'tree.moveDown', title: 'Tree down', run: (ctx) => ctx.tre
 registerCommand({ id: 'tree.moveUp', title: 'Tree up', run: (ctx) => ctx.tree.moveUp() });
 registerCommand({ id: 'tree.expand', title: 'Tree expand', run: (ctx) => ctx.tree.expand() });
 registerCommand({ id: 'tree.collapse', title: 'Tree collapse', run: (ctx) => ctx.tree.collapse() });
-registerCommand({ id: 'tree.openSearch', title: 'Search tree', run: (ctx) => ctx.tree.openSearch() });
-registerCommand({ id: 'tree.closeSearch', title: 'Close tree search', run: (ctx) => ctx.tree.closeSearch() });
-registerCommand({ id: 'tree.searchBackspace', title: 'Delete tree search character', run: (ctx) => ctx.tree.backspaceSearch() });
+registerCommand({
+  id: 'tree.openSearch',
+  title: 'Search tree',
+  run: (ctx) => ctx.tree.openSearch()
+});
+registerCommand({
+  id: 'tree.closeSearch',
+  title: 'Close tree search',
+  run: (ctx) => ctx.tree.closeSearch()
+});
+registerCommand({
+  id: 'tree.searchBackspace',
+  title: 'Delete tree search character',
+  run: (ctx) => ctx.tree.backspaceSearch()
+});
 registerCommand({
   id: 'tree.searchAppend',
   title: 'Append tree search character',
@@ -327,31 +347,41 @@ registerCommand({
 registerCommand({
   id: 'editor.open',
   title: 'Open in editor',
-  run: (ctx) => { void ctx.editor.openCurrentNote(); }
+  run: (ctx) => {
+    void ctx.editor.openCurrentNote();
+  }
 });
 
 registerCommand({
   id: 'theme.useSystem',
   title: 'Use system theme',
-  run: (ctx) => { void ctx.theme.useSystem(); }
+  run: (ctx) => {
+    void ctx.theme.useSystem();
+  }
 });
 
 registerCommand({
   id: 'theme.useLight',
   title: 'Use light theme',
-  run: (ctx) => { void ctx.theme.useLight(); }
+  run: (ctx) => {
+    void ctx.theme.useLight();
+  }
 });
 
 registerCommand({
   id: 'theme.useDark',
   title: 'Use dark theme',
-  run: (ctx) => { void ctx.theme.useDark(); }
+  run: (ctx) => {
+    void ctx.theme.useDark();
+  }
 });
 
 registerCommand({
   id: 'theme.cycle',
   title: 'Cycle theme',
-  run: (ctx) => { void ctx.theme.cycle(); }
+  run: (ctx) => {
+    void ctx.theme.cycle();
+  }
 });
 
 registerCommand({
@@ -374,10 +404,26 @@ registerCommand({
 
 registerCommand({ id: 'tree.close', title: 'Close tree', run: (ctx) => ctx.tree.close() });
 
-registerCommand({ id: 'quickOpen.close', title: 'Close quick open', run: (ctx) => ctx.quickOpen.close() });
-registerCommand({ id: 'quickOpen.moveNext', title: 'Next quick open item', run: (ctx) => ctx.quickOpen.moveNext() });
-registerCommand({ id: 'quickOpen.movePrevious', title: 'Previous quick open item', run: (ctx) => ctx.quickOpen.movePrevious() });
-registerCommand({ id: 'quickOpen.accept', title: 'Open selected note', run: (ctx) => ctx.quickOpen.accept() });
+registerCommand({
+  id: 'quickOpen.close',
+  title: 'Close quick open',
+  run: (ctx) => ctx.quickOpen.close()
+});
+registerCommand({
+  id: 'quickOpen.moveNext',
+  title: 'Next quick open item',
+  run: (ctx) => ctx.quickOpen.moveNext()
+});
+registerCommand({
+  id: 'quickOpen.movePrevious',
+  title: 'Previous quick open item',
+  run: (ctx) => ctx.quickOpen.movePrevious()
+});
+registerCommand({
+  id: 'quickOpen.accept',
+  title: 'Open selected note',
+  run: (ctx) => ctx.quickOpen.accept()
+});
 
 export const DOCUMENT_KEYMAP: Keymap = new Map([
   ['j', 'document.scrollLineDown'],

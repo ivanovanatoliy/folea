@@ -58,7 +58,9 @@ const makeElement = (
     querySelectorAll
   }) as FakeElement;
 
-const makeModel = (spans: readonly { readonly text: string; readonly top: number }[]): TextLayerModel =>
+const makeModel = (
+  spans: readonly { readonly text: string; readonly top: number }[]
+): TextLayerModel =>
   ({
     version: 1,
     text: spans.map((span) => span.text).join(''),
@@ -124,7 +126,11 @@ const buildEnvironment = (config: {
   container.clientHeight = config.clientHeight ?? config.containerRect.height;
 
   const scrollToOffset = vi.fn();
-  const engine = createCaretEngine(container as unknown as HTMLElement, scrollToOffset, () => false);
+  const engine = createCaretEngine(
+    container as unknown as HTMLElement,
+    scrollToOffset,
+    () => false
+  );
 
   return {
     engine,
@@ -170,7 +176,7 @@ describe('caret overlay positioning', () => {
         { text: 'two', top: 43 },
         { text: 'three', top: 68 }
       ]),
-      (container as unknown) as HTMLElement
+      container as unknown as HTMLElement
     );
     engine.enable();
 
@@ -183,7 +189,7 @@ describe('caret overlay positioning', () => {
         { text: 'dos', top: 43 },
         { text: 'tres', top: 68 }
       ]),
-      (container as unknown) as HTMLElement
+      container as unknown as HTMLElement
     );
 
     expect(getCaretOverlay(documentNode)).toBeUndefined();
@@ -199,7 +205,7 @@ describe('caret overlay positioning', () => {
 
     engine.setTextLayer(
       makeModel([{ text: 'alpha', top: 50 }]),
-      (container as unknown) as HTMLElement
+      container as unknown as HTMLElement
     );
     engine.enable();
 
@@ -223,7 +229,7 @@ describe('caret overlay positioning', () => {
         { text: 'two', top: 43 },
         { text: 'three', top: 68 }
       ]),
-      (container as unknown) as HTMLElement
+      container as unknown as HTMLElement
     );
     engine.enable();
 

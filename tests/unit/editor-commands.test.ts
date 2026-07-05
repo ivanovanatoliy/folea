@@ -71,12 +71,60 @@ const makeMinimalContext = (editor: EditorView): CommandContext => {
       zoomIn: vi.fn(),
       zoomOut: vi.fn()
     },
-    outline: { open: vi.fn(), close: vi.fn(), moveNext: vi.fn(), movePrevious: vi.fn(), accept: vi.fn() },
-    links: { open: vi.fn(), close: vi.fn(), moveNext: vi.fn(), movePrevious: vi.fn(), accept: vi.fn() },
-    palette: { open: vi.fn(), close: vi.fn(), moveNext: vi.fn(), movePrevious: vi.fn(), accept: vi.fn(), setQuery: vi.fn() },
-    search: { open: vi.fn(), openGlobal: vi.fn(), close: vi.fn(), moveNext: vi.fn(), movePrevious: vi.fn(), accept: vi.fn(), setQuery: vi.fn() },
-    tree: { moveDown: vi.fn(), moveUp: vi.fn(), collapse: vi.fn(), expand: vi.fn(), close: vi.fn(), openSearch: vi.fn(), closeSearch: vi.fn(), openSelection: vi.fn(), toggleOverlay: vi.fn(), selectFirst: vi.fn(), selectLast: vi.fn(), appendSearchChar: vi.fn(), backspaceSearch: vi.fn() },
-    quickOpen: { open: vi.fn(), close: vi.fn(), moveNext: vi.fn(), movePrevious: vi.fn(), accept: vi.fn(), setQuery: vi.fn() },
+    outline: {
+      open: vi.fn(),
+      close: vi.fn(),
+      moveNext: vi.fn(),
+      movePrevious: vi.fn(),
+      accept: vi.fn()
+    },
+    links: {
+      open: vi.fn(),
+      close: vi.fn(),
+      moveNext: vi.fn(),
+      movePrevious: vi.fn(),
+      accept: vi.fn()
+    },
+    palette: {
+      open: vi.fn(),
+      close: vi.fn(),
+      moveNext: vi.fn(),
+      movePrevious: vi.fn(),
+      accept: vi.fn(),
+      setQuery: vi.fn()
+    },
+    search: {
+      open: vi.fn(),
+      openGlobal: vi.fn(),
+      close: vi.fn(),
+      moveNext: vi.fn(),
+      movePrevious: vi.fn(),
+      accept: vi.fn(),
+      setQuery: vi.fn()
+    },
+    tree: {
+      moveDown: vi.fn(),
+      moveUp: vi.fn(),
+      collapse: vi.fn(),
+      expand: vi.fn(),
+      close: vi.fn(),
+      openSearch: vi.fn(),
+      closeSearch: vi.fn(),
+      openSelection: vi.fn(),
+      toggleOverlay: vi.fn(),
+      selectFirst: vi.fn(),
+      selectLast: vi.fn(),
+      appendSearchChar: vi.fn(),
+      backspaceSearch: vi.fn()
+    },
+    quickOpen: {
+      open: vi.fn(),
+      close: vi.fn(),
+      moveNext: vi.fn(),
+      movePrevious: vi.fn(),
+      accept: vi.fn(),
+      setQuery: vi.fn()
+    },
     vault: { open: vi.fn(), close: vi.fn() }
   };
 };

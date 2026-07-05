@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process';
 const root = process.cwd();
 const home = os.homedir();
 const dist = path.join(root, 'dist');
-const icon = path.join(root, 'build', 'icon.png');
+const icon = path.join(root, 'assets', 'brand', 'folea-icon.svg');
 
 const assertReadable = async (filePath, label) => {
   try {
@@ -55,10 +55,10 @@ const installLinux = async () => {
   const binDir = path.join(home, '.local', 'bin');
   const desktopDir = path.join(home, '.local', 'share', 'applications');
   const iconRoot = path.join(home, '.local', 'share', 'icons', 'hicolor');
-  const iconDir = path.join(iconRoot, '512x512', 'apps');
+  const iconDir = path.join(iconRoot, 'scalable', 'apps');
   const wrapper = path.join(binDir, 'folea');
   const desktopFile = path.join(desktopDir, 'folea.desktop');
-  const installedIcon = path.join(iconDir, 'folea.png');
+  const installedIcon = path.join(iconDir, 'folea.svg');
 
   await copyDirectory(source, installDir);
   await fs.chmod(path.join(installDir, 'folea'), 0o755);

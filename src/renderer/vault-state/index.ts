@@ -143,10 +143,9 @@ export const createWarmupQueue = (
 
   const ensureWorker = (): Worker => {
     if (!worker) {
-      worker = new Worker(
-        new URL('../../workers/typst-compile/index.ts', import.meta.url),
-        { type: 'module' }
-      );
+      worker = new Worker(new URL('../../workers/typst-compile/index.ts', import.meta.url), {
+        type: 'module'
+      });
       worker.addEventListener('message', (event: MessageEvent<unknown>) => {
         try {
           const result = parseCompileResult(event.data);

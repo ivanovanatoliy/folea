@@ -49,7 +49,9 @@ test.afterEach(async () => {
     const proc = electronApp.process();
     const pid = proc.pid;
     await electronApp
-      .evaluate(async ({ app }) => { app.quit(); })
+      .evaluate(async ({ app }) => {
+        app.quit();
+      })
       .catch(() => undefined);
     await Promise.race([
       electronApp.close().catch(() => undefined),
@@ -58,7 +60,11 @@ test.afterEach(async () => {
     if (process.platform === 'win32' && pid != null) {
       spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
     } else {
-      try { proc.kill(); } catch { /* already exited */ }
+      try {
+        proc.kill();
+      } catch {
+        /* already exited */
+      }
     }
     await new Promise<void>((resolve) => setTimeout(resolve, 500));
     electronApp = undefined;
@@ -111,7 +117,9 @@ test('opens a vault via the Open vault button and renders the note', async () =>
     await expectSurfaceRendered(page);
     await expect(page.getByTestId('start-menu')).not.toBeVisible();
     await expect(page.getByTestId('typst-rendered-document')).toContainText('Hello Vault');
-    await expect(page.getByTestId('typst-rendered-document')).toContainText('Welcome to the vault.');
+    await expect(page.getByTestId('typst-rendered-document')).toContainText(
+      'Welcome to the vault.'
+    );
   } finally {
     await fs.rm(vaultRoot, { recursive: true, force: true }).catch(() => {});
     await fs.rm(userDataDir, { recursive: true, force: true }).catch(() => {});
@@ -155,9 +163,7 @@ test('reopens vault from recent list after closing', async () => {
     // Start menu appears with the vault in the recent list
     await expect(page.getByTestId('start-menu')).toBeVisible({ timeout: 5_000 });
     await expect(page.getByTestId('start-menu-vault-row')).toHaveCount(1);
-    await expect(page.getByTestId('start-menu-vault-row')).toContainText(
-      path.basename(vaultRoot)
-    );
+    await expect(page.getByTestId('start-menu-vault-row')).toContainText(path.basename(vaultRoot));
 
     // Click the recent vault to reopen it
     await page.getByTestId('start-menu-vault-row').click();
