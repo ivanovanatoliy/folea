@@ -69,24 +69,17 @@ editor.command = code --reuse-window %FILE%
 
 `editor.command` is split on whitespace; `%FILE%` is replaced with the note path.
 `FOLEA_EDITOR_CMD` env var overrides `editor.command` at runtime.
+The default is VS Code (`code --reuse-window`).
 
-**Editor command examples:**
-
-```ini
-# VS Code
-editor.command = code --reuse-window %FILE%
-```
+**Neovim** requires a terminal emulator in the command. Specify both explicitly:
 
 ```ini
-# Neovim — leave unset to auto-detect an installed terminal emulator.
-# Set explicitly only to pick a specific terminal:
 editor.command = kitty -e nvim %FILE%
 ```
 
 When folea controls the Neovim launch it passes `--listen <socket>` and an auto-save hook.
 The socket lets folea reuse an already-open session — subsequent `editor.open` calls switch the
 buffer instead of opening a new window. The hook saves on `InsertLeave` so edits are never lost.
-Both are lost when a custom `editor.command` is set.
 
 `keys.config`:
 

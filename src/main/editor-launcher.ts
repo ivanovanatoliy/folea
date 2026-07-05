@@ -80,12 +80,5 @@ export function buildEditorArgs(absPath: string, configuredCommand = ''): string
       .map((token) => (token === '%FILE%' ? absPath : token));
   }
 
-  switch (process.platform) {
-    case 'win32':
-      return ['cmd', '/c', 'start', '', absPath];
-    case 'darwin':
-      return ['open', absPath];
-    default:
-      return ['xdg-open', absPath];
-  }
+  return ['code', '--reuse-window', absPath];
 }

@@ -63,40 +63,12 @@ describe('buildEditorArgs', () => {
     ]);
   });
 
-  it('win32 default: opens file with cmd start', () => {
-    const orig = process.platform;
-    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
-    try {
-      expect(buildEditorArgs('C:\\vault\\note.typ')).toEqual([
-        'cmd',
-        '/c',
-        'start',
-        '',
-        'C:\\vault\\note.typ'
-      ]);
-    } finally {
-      Object.defineProperty(process, 'platform', { value: orig, configurable: true });
-    }
-  });
-
-  it('darwin default: opens file with open', () => {
-    const orig = process.platform;
-    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true });
-    try {
-      expect(buildEditorArgs('/vault/note.typ')).toEqual(['open', '/vault/note.typ']);
-    } finally {
-      Object.defineProperty(process, 'platform', { value: orig, configurable: true });
-    }
-  });
-
-  it('linux default: opens file with xdg-open', () => {
-    const orig = process.platform;
-    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
-    try {
-      expect(buildEditorArgs('/vault/note.typ')).toEqual(['xdg-open', '/vault/note.typ']);
-    } finally {
-      Object.defineProperty(process, 'platform', { value: orig, configurable: true });
-    }
+  it('default: opens file in VS Code', () => {
+    expect(buildEditorArgs('/vault/note.typ')).toEqual([
+      'code',
+      '--reuse-window',
+      '/vault/note.typ'
+    ]);
   });
 });
 
