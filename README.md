@@ -25,34 +25,28 @@ user's external terminal/editor command, normally Neovim with tinymist.
 
 ## Install
 
-M10 packages are unsigned. Build artifacts are produced with `electron-builder`:
+### From source
 
 ```bash
 npm install
-npm run install:unpacked # Build an unpacked app and add folea to the app menu
-npm run uninstall:unpacked
+npm run app:install    # build + install for the current OS
+npm run app:uninstall  # remove the installed copy
 ```
 
-Manual packaging commands:
-
-```bash
-npm run package       # current OS
-npm run package:dir   # current OS unpacked app
-npm run package:linux:appimage  # Linux AppImage-only smoke build
-npm run package:all   # cross-targets where the host/toolchain supports it
-npm run install:appimage   # Linux: build AppImage and add folea to the app menu
-npm run uninstall:appimage
-```
-
-`install:unpacked` installs the current OS unpacked build from source: on Linux it writes
+`app:install` builds an unpacked app and registers it with the OS: on Linux it writes
 `~/.local/share/folea/unpacked`, `~/.local/bin/folea`, the icon, and
 `~/.local/share/applications/folea.desktop`; on macOS it copies `folea.app` to `~/Applications`;
-on Windows it copies the app to `%LOCALAPPDATA%\\Programs\\folea` and creates a Start Menu shortcut.
-`install:appimage` is Linux-only and installs the AppImage variant to `~/.local/share/folea`.
+on Windows it copies the app to `%LOCALAPPDATA%\Programs\folea` and creates a Start Menu shortcut.
 
-Targets are Linux AppImage + deb, Windows NSIS, and macOS dmg + zip. On macOS, unsigned builds may
-need **Open Anyway** in System Settings → Privacy & Security or `xattr -dr com.apple.quarantine`.
-On Windows, SmartScreen may require **More info** → **Run anyway**.
+### Build a distributable
+
+```bash
+npm run package   # produces a distributable for the current OS
+```
+
+Targets are Linux AppImage + deb, Windows NSIS, and macOS dmg + zip. Packages are unsigned — on
+macOS use **Open Anyway** in System Settings → Privacy & Security (or
+`xattr -dr com.apple.quarantine`); on Windows SmartScreen may require **More info → Run anyway**.
 
 ## Configuration
 
