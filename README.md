@@ -54,11 +54,9 @@ Global config lives in Electron's `userData` directory:
 
 - Linux: `~/.config/folea/`
 - macOS: `~/Library/Application Support/folea/`
-- Windows: `%APPDATA%\\folea\\`
+- Windows: `%APPDATA%/folea/`
 
 Vault-local prefs may override global prefs key by key from `<vault>/.folea/prefs.config`.
-Precedence is vault `.folea/prefs.config` → global `prefs.config` → built-in defaults.
-`keys.config` is global only in M10.
 
 `prefs.config`:
 
@@ -69,16 +67,36 @@ theme = dark
 editor.command = kitty -e nvim %FILE%
 ```
 
-`theme` is `system`, `light`, or `dark`; `system` is the default and follows the OS color scheme.
-The command palette exposes `Use system theme`, `Use light theme`, `Use dark theme`, and
-`Cycle theme`, which write the selected theme into the global `prefs.config`.
-`editor.command` is split on whitespace and the exact `%FILE%` token is replaced with the note
-path. `FOLEA_EDITOR_CMD` still overrides `editor.command`.
+`editor.command` is split on whitespace; `%FILE%` is replaced with the note path.
+`FOLEA_EDITOR_CMD` env var overrides `editor.command` at runtime.
+
+**Editor command examples:**
+
+```ini
+# Neovim — leave unset to auto-detect an installed terminal emulator.
+# Set explicitly only to pick a specific terminal:
+editor.command = kitty -e nvim %FILE%
+```
+
+When folea controls the Neovim launch it passes `--listen <socket>` and an auto-save hook.
+The socket lets folea reuse an already-open session — subsequent `editor.open` calls switch the
+buffer instead of opening a new window. The hook saves on `InsertLeave` so edits are never lost.
+Both are lost if you specify a custom `editor.command` that invokes nvim directly.
+
+```ini
+# VS Code
+editor.command = code --reuse-window %FILE%
+
+# System default app (Linux)
+editor.command = xdg-open %FILE%
+
+# System default app (macOS)
+editor.command = open %FILE%
+```
 
 `keys.config`:
 
 ```text
-# one binding per line
 document.scrollHalfDown <C-f>
 view.toggleTree t
 editor.open e
