@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { buildTerminalArgs, EditorLauncher, nvimSockPath } from '../../src/main/editor-launcher';
@@ -119,14 +122,20 @@ describe('buildTerminalArgs', () => {
   });
 
   it('linux without $TERMINAL: falls back to x-terminal-emulator', () => {
-    const orig = process.platform;
+    const tmpDir = mkdtempSync(join(tmpdir(), 'folea-test-'));
+    writeFileSync(join(tmpDir, 'x-terminal-emulator'), '');
+    const origPlatform = process.platform;
+    const origPath = process.env.PATH;
     Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
+    process.env.PATH = tmpDir;
     delete process.env.TERMINAL;
     try {
       const args = buildTerminalArgs(SOCK, '/note.typ');
       expect(args[0]).toBe('x-terminal-emulator');
     } finally {
-      Object.defineProperty(process, 'platform', { value: orig, configurable: true });
+      Object.defineProperty(process, 'platform', { value: origPlatform, configurable: true });
+      process.env.PATH = origPath;
+      rmSync(tmpDir, { recursive: true });
     }
   });
 });
@@ -138,9 +147,14 @@ describe('EditorLauncher.open path validation', () => {
   });
 
   it('accepts a simple relative path without throwing', () => {
-    const launcher = new EditorLauncher();
-    expect(() => launcher.open('/tmp', 'note.typ')).not.toThrow();
-    launcher.dispose();
+    process.env.FOLEA_EDITOR_CMD = 'echo';
+    try {
+      const launcher = new EditorLauncher();
+      expect(() => launcher.open('/tmp', 'note.typ')).not.toThrow();
+      launcher.dispose();
+    } finally {
+      delete process.env.FOLEA_EDITOR_CMD;
+    }
   });
 });
 
