@@ -15,11 +15,13 @@ user's external terminal/editor command, normally Neovim with tinymist.
 
 ## Screenshots
 
-<img width="1920" height="1049" alt="image" src="https://github.com/user-attachments/assets/5bc7401b-e0d5-460c-bdfb-c6a24ecc6ac3" />
+![start screen](assets/screenshots/start_screen.png)
 
-<img width="1920" height="1049" alt="image" src="https://github.com/user-attachments/assets/4ce8d1a8-9c16-493e-a4ad-d8d4c2c71f0c" />
+![editor open](assets/screenshots/editor_open.png)
 
-<img width="1920" height="1048" alt="image" src="https://github.com/user-attachments/assets/66573be6-b705-4ab8-8212-ba76389100e8" />
+![tree](assets/screenshots/tree.png)
+
+![palette](assets/screenshots/palette.png)
 
 
 ## Install
