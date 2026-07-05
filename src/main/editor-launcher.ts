@@ -62,9 +62,12 @@ export class EditorLauncher {
 
   private launchEditor(absPath: string, configuredCommand: string): void {
     const args = buildEditorArgs(absPath, configuredCommand);
+    // shell: true so the command is resolved against the user's full PATH,
+    // which Electron does not inherit when launched from a desktop environment.
     const child = spawn(args[0] as string, args.slice(1), {
       detached: true,
-      stdio: 'ignore'
+      stdio: 'ignore',
+      shell: true
     });
     child.on('error', (err) => console.error('[folea] editor launch failed:', err.message));
     child.unref();
