@@ -64,14 +64,13 @@ Vault-local prefs may override global prefs key by key from `<vault>/.folea/pref
 search.vaultCaseSensitive = false
 search.inFileCaseSensitive = false
 theme = dark
-editor.command = code --reuse-window %FILE%
 ```
 
-`editor.command` is split on whitespace; `%FILE%` is replaced with the note path.
-`FOLEA_EDITOR_CMD` env var overrides `editor.command` at runtime.
-The default is VS Code (`code --reuse-window`).
+`editor.command` opens the current note when you press `<C-e>`. It defaults to VS Code
+(`code --reuse-window`). `%FILE%` is replaced with the note path; `FOLEA_EDITOR_CMD` env var
+overrides it at runtime.
 
-**Neovim** requires a terminal emulator in the command. Specify both explicitly:
+**Neovim** requires a terminal emulator — specify both in `editor.command`:
 
 ```ini
 editor.command = kitty -e nvim %FILE%
