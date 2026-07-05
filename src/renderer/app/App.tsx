@@ -157,6 +157,11 @@ export const App = () => {
   const [selectedRelPath, setSelectedRelPath] = createSignal('');
   const [selectedTreeIndex, setSelectedTreeIndex] = createSignal(0);
   const [collapsedFolders, setCollapsedFolders] = createSignal<ReadonlySet<string>>(new Set());
+  const docName = createMemo(() => {
+    const relPath = selectedRelPath();
+    if (!relPath) return '';
+    return notes().find((n) => n.relPath === relPath)?.basename ?? '';
+  });
   const [vaultStatus, setVaultStatus] = createSignal('no vault');
   const [activeContext, setActiveContext] = createSignal('document');
   const [currentSource, setCurrentSource] = createSignal('');
@@ -1748,6 +1753,7 @@ export const App = () => {
         vaultCount={notes().length}
         pageStatus={pageStatus()}
         mode={activeContext()}
+        docName={docName()}
         warmupMessage={warmupMessage()}
         configWarning={configWarnings()[0]}
       />

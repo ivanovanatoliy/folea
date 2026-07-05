@@ -8,6 +8,7 @@ interface StatusLineProps {
   readonly vaultCount: number;
   readonly pageStatus: string;
   readonly mode: string;
+  readonly docName?: string | undefined;
   readonly warmupMessage?: string | undefined;
   readonly configWarning?: string | undefined;
 }
@@ -43,8 +44,13 @@ export const StatusLine = (props: StatusLineProps) => {
 
   return (
     <footer class="statusline" data-testid="statusline">
-      <span class="statusline-page" data-testid="statusline-page">
-        {props.pageStatus}
+      <Show when={props.docName}>
+        <span class="statusline-doc" data-testid="statusline-doc">
+          {props.docName}
+        </span>
+      </Show>
+      <span class="statusline-zoom" data-testid="statusline-zoom">
+        [{formatZoom(zoom())}]
       </span>
       <Show when={props.warmupMessage}>
         <span class="statusline-warmup" data-testid="statusline-warmup">
@@ -56,11 +62,11 @@ export const StatusLine = (props: StatusLineProps) => {
           {props.configWarning}
         </span>
       </Show>
-      <span class="statusline-zoom" data-testid="statusline-zoom">
-        {formatZoom(zoom())}
+      <span class="statusline-page" data-testid="statusline-page">
+        {props.pageStatus}
       </span>
       <span class="statusline-mode" data-testid="statusline-mode">
-        {props.mode}
+        [{props.mode}]
       </span>
     </footer>
   );
