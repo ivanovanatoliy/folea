@@ -23,7 +23,7 @@ export class EditorLauncher {
       return;
     }
 
-    this.launchEditor(absPath, configuredCommand);
+    this.launchEditor(absPath, sockPath, configuredCommand);
   }
 
   dispose(): void {}
@@ -60,8 +60,8 @@ export class EditorLauncher {
     return true;
   }
 
-  private launchEditor(absPath: string, configuredCommand: string): void {
-    const args = buildEditorArgs(absPath, configuredCommand);
+  private launchEditor(absPath: string, sockPath: string, configuredCommand: string): void {
+    const args = buildEditorArgs(absPath, sockPath, configuredCommand);
     // shell: true so the command is resolved against the user's full PATH,
     // which Electron does not inherit when launched from a desktop environment.
     const child = spawn(args[0] as string, args.slice(1), {
@@ -74,13 +74,21 @@ export class EditorLauncher {
   }
 }
 
-export function buildEditorArgs(absPath: string, configuredCommand = ''): string[] {
+export function buildEditorArgs(
+  absPath: string,
+  sockPath: string,
+  configuredCommand = ''
+): string[] {
   const custom = process.env.FOLEA_EDITOR_CMD || configuredCommand;
   if (custom) {
     return custom
       .trim()
       .split(/\s+/)
-      .map((token) => (token === '%FILE%' ? absPath : token));
+      .map((token) => {
+        if (token === '%FILE%') return absPath;
+        if (token === '%SOCK%') return sockPath;
+        return token;
+      });
   }
 
   return ['code', '--reuse-window', absPath];

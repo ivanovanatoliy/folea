@@ -70,21 +70,21 @@ theme = dark
 (`code --reuse-window`). `%FILE%` is replaced with the note path; `FOLEA_EDITOR_CMD` env var
 overrides it at runtime.
 
-**VS Code** (default, no config needed):
+**VS Code** (default):
 
 ```ini
 editor.command = code --reuse-window %FILE%
 ```
 
-**Neovim** requires a terminal emulator — specify both in `editor.command`:
+**Neovim**:
 
 ```ini
-editor.command = kitty -e nvim %FILE%
+editor.command = kitty -e nvim --listen %SOCK% %FILE%
 ```
 
-When folea controls the Neovim launch it passes `--listen <socket>` and an auto-save hook.
-The socket lets folea reuse an already-open session — subsequent `editor.open` calls switch the
-buffer instead of opening a new window. The hook saves on `InsertLeave` so edits are never lost.
+`%SOCK%` is replaced with a vault-scoped socket path. With `--listen`, folea reuses an
+already-open nvim session — subsequent `editor.open` calls switch the buffer instead of opening
+a new window. Omit `%SOCK%` if you don't need session reuse.
 
 `keys.config`:
 
