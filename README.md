@@ -114,7 +114,8 @@ npm run rebuild
 `npm run test:e2e` launches Electron through Playwright. On headless Linux, run it under a display
 server such as Xvfb.
 
-## Key Bindings
+<details>
+<summary><strong>Default Key Bindings</strong></summary>
 
 All bindings are remappable via `keys.config`. The command ID shown in the palette is the
 key used for remapping.
@@ -161,6 +162,8 @@ key used for remapping.
 | `Enter` / `gd` | Follow link under caret |
 | `m<x>` | Set mark `x` |
 | `'<x>` | Jump to mark `x` |
+
+</details>
 
 ## Contributing
 
