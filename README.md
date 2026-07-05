@@ -29,19 +29,21 @@ user's external terminal/editor command, normally Neovim with tinymist.
 
 ```bash
 npm install
-npm run app:install    # build + install for the current OS
-npm run app:uninstall  # remove the installed copy
+npm run app:install
+npm run app:uninstall 
 ```
 
-`app:install` builds an unpacked app and registers it with the OS: on Linux it writes
+`app:install` builds an unpacked app and registers it with the OS: 
+- on Linux it writes
 `~/.local/share/folea/unpacked`, `~/.local/bin/folea`, the icon, and
-`~/.local/share/applications/folea.desktop`; on macOS it copies `folea.app` to `~/Applications`;
-on Windows it copies the app to `%LOCALAPPDATA%\Programs\folea` and creates a Start Menu shortcut.
+`~/.local/share/applications/folea.desktop`; 
+- on macOS it copies `folea.app` to `~/Applications`;
+- on Windows it copies the app to `%LOCALAPPDATA%\Programs\folea` and creates a Start Menu shortcut.
 
-### Build a distributable
+### Build a package
 
 ```bash
-npm run package   # produces a distributable for the current OS
+npm run package 
 ```
 
 Targets are Linux AppImage + deb, Windows NSIS, and macOS dmg + zip. Packages are unsigned — on
@@ -94,25 +96,7 @@ view.toggleTree t
 editor.open e
 ```
 
-The command ID is the same ID shown in the command palette. Remapping removes the default chord
-for that command in every default context where it appears, then adds the configured chord.
-Multiple lines for the same command add multiple chords. Invalid lines warn in the status line and
-defaults remain usable.
-
-## Development
-
-```bash
-npm install
-npm run dev
-npm run typecheck
-npm run lint
-npm test
-npm run test:e2e
-npm run rebuild
-```
-
-`npm run test:e2e` launches Electron through Playwright. On headless Linux, run it under a display
-server such as Xvfb.
+The command ID is the same ID shown in the command palette. 
 
 <details>
 <summary><strong>Default Key Bindings</strong></summary>
@@ -164,6 +148,20 @@ key used for remapping.
 | `'<x>` | Jump to mark `x` |
 
 </details>
+
+## Development
+
+```bash
+npm install
+npm run dev
+npm run typecheck
+npm run lint
+npm test
+npm run test:e2e
+npm run rebuild
+```
+
+`npm run test:e2e` launches Electron through Playwright. 
 
 ## Contributing
 
