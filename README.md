@@ -64,13 +64,18 @@ Vault-local prefs may override global prefs key by key from `<vault>/.folea/pref
 search.vaultCaseSensitive = false
 search.inFileCaseSensitive = false
 theme = dark
-editor.command = kitty -e nvim %FILE%
+editor.command = code --reuse-window %FILE%
 ```
 
 `editor.command` is split on whitespace; `%FILE%` is replaced with the note path.
 `FOLEA_EDITOR_CMD` env var overrides `editor.command` at runtime.
 
 **Editor command examples:**
+
+```ini
+# VS Code
+editor.command = code --reuse-window %FILE%
+```
 
 ```ini
 # Neovim — leave unset to auto-detect an installed terminal emulator.
@@ -81,18 +86,7 @@ editor.command = kitty -e nvim %FILE%
 When folea controls the Neovim launch it passes `--listen <socket>` and an auto-save hook.
 The socket lets folea reuse an already-open session — subsequent `editor.open` calls switch the
 buffer instead of opening a new window. The hook saves on `InsertLeave` so edits are never lost.
-Both are lost if you specify a custom `editor.command` that invokes nvim directly.
-
-```ini
-# VS Code
-editor.command = code --reuse-window %FILE%
-
-# System default app (Linux)
-editor.command = xdg-open %FILE%
-
-# System default app (macOS)
-editor.command = open %FILE%
-```
+Both are lost when a custom `editor.command` is set.
 
 `keys.config`:
 
