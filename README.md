@@ -17,12 +17,11 @@ user's external terminal/editor command, normally Neovim with tinymist.
 
 ![start screen](assets/screenshots/start_screen.png)
 
-![editor open](assets/screenshots/editor_open.png)
-
 ![tree](assets/screenshots/tree.png)
 
 ![palette](assets/screenshots/palette.png)
 
+![editor open](assets/screenshots/editor_open.png)
 
 ## Install
 
