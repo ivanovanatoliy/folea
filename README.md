@@ -70,6 +70,12 @@ theme = dark
 (`code --reuse-window`). `%FILE%` is replaced with the note path; `FOLEA_EDITOR_CMD` env var
 overrides it at runtime.
 
+**VS Code** (default, no config needed):
+
+```ini
+editor.command = code --reuse-window %FILE%
+```
+
 **Neovim** requires a terminal emulator — specify both in `editor.command`:
 
 ```ini
