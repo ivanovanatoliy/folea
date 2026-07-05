@@ -99,16 +99,6 @@ for that command in every default context where it appears, then adds the config
 Multiple lines for the same command add multiple chords. Invalid lines warn in the status line and
 defaults remain usable.
 
-## Edit Runtime Dependencies
-
-For read/search/navigation, folea is self-contained. For `editor.open`, install:
-
-- Neovim
-- tinymist
-- `typst-preview.nvim` if you want live Typst preview from Neovim
-
-folea does not redistribute these tools; it only launches them.
-
 ## Development
 
 ```bash
