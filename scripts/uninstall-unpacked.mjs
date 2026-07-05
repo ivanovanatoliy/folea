@@ -19,7 +19,7 @@ const uninstallLinux = async () => {
   const desktopDir = path.join(home, '.local', 'share', 'applications');
   const desktopFile = path.join(desktopDir, 'folea.desktop');
   const iconRoot = path.join(home, '.local', 'share', 'icons', 'hicolor');
-  const installedIcon = path.join(iconRoot, '512x512', 'apps', 'folea.png');
+  const installedIcon = path.join(iconRoot, 'scalable', 'apps', 'folea.svg');
 
   await fs.rm(installDir, { recursive: true, force: true });
   await fs.rm(wrapper, { force: true });

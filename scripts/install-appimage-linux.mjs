@@ -11,15 +11,15 @@ if (process.platform !== 'linux') {
 const root = process.cwd();
 const home = os.homedir();
 const appImage = path.join(root, 'dist', 'folea-0.0.0.AppImage');
-const icon = path.join(root, 'build', 'icon.png');
+const icon = path.join(root, 'assets', 'brand', 'folea-icon.svg');
 const installDir = path.join(home, '.local', 'share', 'folea');
 const binDir = path.join(home, '.local', 'bin');
 const desktopDir = path.join(home, '.local', 'share', 'applications');
-const iconDir = path.join(home, '.local', 'share', 'icons', 'hicolor', '512x512', 'apps');
+const iconDir = path.join(home, '.local', 'share', 'icons', 'hicolor', 'scalable', 'apps');
 const installedAppImage = path.join(installDir, 'folea.AppImage');
 const wrapper = path.join(binDir, 'folea');
 const desktopFile = path.join(desktopDir, 'folea.desktop');
-const installedIcon = path.join(iconDir, 'folea.png');
+const installedIcon = path.join(iconDir, 'folea.svg');
 
 const assertReadable = async (filePath, label) => {
   try {

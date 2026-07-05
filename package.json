@@ -16,8 +16,7 @@
     "copyright": "Copyright © 2026 folea contributors",
     "files": [
       "out/**",
-      "build/icon.svg",
-      "build/icon.png",
+      "assets/brand/folea-icon.svg",
       "package.json",
       "LICENSE",
       "NOTICE"
@@ -30,20 +29,20 @@
         "dmg",
         "zip"
       ],
-      "icon": "build/icon.png"
+      "icon": "assets/brand/folea-icon.svg"
     },
     "win": {
       "target": [
         "nsis"
       ],
-      "icon": "build/icon.png"
+      "icon": "assets/brand/folea-icon.svg"
     },
     "linux": {
       "target": [
         "AppImage",
         "deb"
       ],
-      "icon": "build/icon.png",
+      "icon": "assets/brand/folea-icon.svg",
       "category": "Utility",
       "maintainer": "folea contributors <maintainers@folea.dev>",
       "syncDesktopName": true
@@ -56,10 +55,8 @@
     "package:dir": "npm run build && electron-builder --dir --publish never",
     "package:linux:appimage": "npm run build && electron-builder --linux AppImage --publish never",
     "package:all": "npm run build && electron-builder --linux AppImage deb --win nsis --mac dmg zip --publish never",
-    "install:unpacked": "npm run package:dir && node scripts/install-unpacked.mjs",
-    "uninstall:unpacked": "node scripts/uninstall-unpacked.mjs",
-    "install:appimage": "npm run package:linux:appimage && node scripts/install-appimage-linux.mjs",
-    "uninstall:appimage": "node scripts/uninstall-appimage-linux.mjs",
+    "app:install": "npm run package:dir && node scripts/install-unpacked.mjs",
+    "app:uninstall": "node scripts/uninstall-unpacked.mjs",
     "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
     "lint": "eslint \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\" \"*.config.ts\"",
     "format": "prettier --check .",
