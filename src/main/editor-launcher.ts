@@ -9,16 +9,16 @@ type TerminalEntry = { name: string; argBuilder: (nvimArgs: string[]) => string[
 // Ordered by popularity on modern Linux distros. Each entry specifies how to
 // pass a command + args to that particular terminal.
 const LINUX_TERMINAL_CANDIDATES: TerminalEntry[] = [
-  { name: 'kitty',           argBuilder: (a) => a },
-  { name: 'alacritty',       argBuilder: (a) => ['-e', ...a] },
-  { name: 'wezterm',         argBuilder: (a) => ['start', '--', ...a] },
-  { name: 'foot',            argBuilder: (a) => a },
-  { name: 'ghostty',         argBuilder: (a) => ['-e', ...a] },
-  { name: 'xterm',           argBuilder: (a) => ['-e', ...a] },
-  { name: 'konsole',         argBuilder: (a) => ['-e', ...a] },
-  { name: 'gnome-terminal',  argBuilder: (a) => ['--', ...a] },
-  { name: 'xfce4-terminal',  argBuilder: (a) => ['-e', ...a] },
-  { name: 'x-terminal-emulator', argBuilder: (a) => ['-e', ...a] },
+  { name: 'kitty', argBuilder: (a) => a },
+  { name: 'alacritty', argBuilder: (a) => ['-e', ...a] },
+  { name: 'wezterm', argBuilder: (a) => ['start', '--', ...a] },
+  { name: 'foot', argBuilder: (a) => a },
+  { name: 'ghostty', argBuilder: (a) => ['-e', ...a] },
+  { name: 'xterm', argBuilder: (a) => ['-e', ...a] },
+  { name: 'konsole', argBuilder: (a) => ['-e', ...a] },
+  { name: 'gnome-terminal', argBuilder: (a) => ['--', ...a] },
+  { name: 'xfce4-terminal', argBuilder: (a) => ['-e', ...a] },
+  { name: 'x-terminal-emulator', argBuilder: (a) => ['-e', ...a] }
 ];
 
 function findLinuxTerminal(): TerminalEntry {
@@ -36,7 +36,7 @@ function findLinuxTerminal(): TerminalEntry {
 
   throw new Error(
     'No terminal emulator found. Install one of: kitty, alacritty, wezterm, foot, xterm. ' +
-    'Or set FOLEA_EDITOR_CMD to a custom launch command.'
+      'Or set FOLEA_EDITOR_CMD to a custom launch command.'
   );
 }
 
@@ -90,7 +90,11 @@ export class EditorLauncher {
 
     if (result.error || result.status !== 0) {
       // Socket file is stale — clean up so next open spawns a fresh instance.
-      try { unlinkSync(sockPath); } catch { /* ignore */ }
+      try {
+        unlinkSync(sockPath);
+      } catch {
+        /* ignore */
+      }
       return false;
     }
 
@@ -108,10 +112,17 @@ export class EditorLauncher {
   }
 }
 
-export function buildTerminalArgs(sockPath: string, absPath: string, configuredCommand = ''): string[] {
+export function buildTerminalArgs(
+  sockPath: string,
+  absPath: string,
+  configuredCommand = ''
+): string[] {
   const custom = process.env.FOLEA_EDITOR_CMD || configuredCommand;
   if (custom) {
-    return custom.trim().split(/\s+/).map((token) => (token === '%FILE%' ? absPath : token));
+    return custom
+      .trim()
+      .split(/\s+/)
+      .map((token) => (token === '%FILE%' ? absPath : token));
   }
 
   switch (process.platform) {

@@ -178,8 +178,9 @@ export const createSurface = (
   const getTextLayer = (): import('../../shared/worker/typst').TextLayerModel | undefined =>
     latestTextLayer;
 
-  const getTextLayerTsels = (): readonly HTMLElement[] =>
-    [...container.querySelectorAll<HTMLElement>('.typst-document .tsel')];
+  const getTextLayerTsels = (): readonly HTMLElement[] => [
+    ...container.querySelectorAll<HTMLElement>('.typst-document .tsel')
+  ];
 
   const setSearchHighlight = (index: number): boolean => {
     const documentNode = container.querySelector<HTMLElement>('.typst-document');
@@ -214,11 +215,7 @@ export const createSurface = (
 
     const count = tsels.length;
     const start =
-      lastSearchIndex >= 0
-        ? lastSearchIndex + (forward ? 1 : -1)
-        : forward
-          ? 0
-          : count - 1;
+      lastSearchIndex >= 0 ? lastSearchIndex + (forward ? 1 : -1) : forward ? 0 : count - 1;
     const normalizedStart = ((start % count) + count) % count;
 
     for (let offset = 0; offset < count; offset += 1) {
@@ -234,7 +231,10 @@ export const createSurface = (
         const rect = tsel.getBoundingClientRect();
         container.scrollTop = Math.max(
           0,
-          rect.top - container.getBoundingClientRect().top + container.scrollTop - container.clientHeight * 0.35
+          rect.top -
+            container.getBoundingClientRect().top +
+            container.scrollTop -
+            container.clientHeight * 0.35
         );
         emitPageStatus();
 
@@ -460,33 +460,33 @@ export const createSurface = (
   // stopImmediatePropagation kills other handlers so the new-window path never runs.
   // 'auxclick' covers middle-button clicks which fire auxclick, not click, in Chromium.
   const interceptLinkClick = (event: Event): void => {
-      const target = event.target as Element | null;
-      if (!target) return;
+    const target = event.target as Element | null;
+    if (!target) return;
 
-      // Walk up from click target to find the nearest <a> ancestor.
-      let anchor: Element | null = target.closest('a');
+    // Walk up from click target to find the nearest <a> ancestor.
+    let anchor: Element | null = target.closest('a');
 
-      // Fallback: if clicked element is not a DOM descendant of <a> but is
-      // geometrically over a link area (can happen with tsel divs in foreignObject),
-      // find the <a> by checking bounding rects.
-      if (!anchor) {
-        const { clientX: x, clientY: y } = event as MouseEvent;
-        for (const a of container.querySelectorAll<Element>('a')) {
-          const r = a.getBoundingClientRect();
-          if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-            anchor = a;
-            break;
-          }
+    // Fallback: if clicked element is not a DOM descendant of <a> but is
+    // geometrically over a link area (can happen with tsel divs in foreignObject),
+    // find the <a> by checking bounding rects.
+    if (!anchor) {
+      const { clientX: x, clientY: y } = event as MouseEvent;
+      for (const a of container.querySelectorAll<Element>('a')) {
+        const r = a.getBoundingClientRect();
+        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+          anchor = a;
+          break;
         }
       }
+    }
 
-      if (!anchor) return;
-      const href = svgAnchorHref(anchor);
-      if (!href) return;
+    if (!anchor) return;
+    const href = svgAnchorHref(anchor);
+    if (!href) return;
 
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      dispatchLinkHref(href);
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    dispatchLinkHref(href);
   };
   container.addEventListener('click', interceptLinkClick, { capture: true });
   container.addEventListener('auxclick', interceptLinkClick, { capture: true });
@@ -556,7 +556,12 @@ export const createSurface = (
         );
         setState('rendered');
         emitPageStatus();
-        emitRendered({ noteId, cacheKey, fromCache: true, durationMs: performance.now() - latestStartedAt });
+        emitRendered({
+          noteId,
+          cacheKey,
+          fromCache: true,
+          durationMs: performance.now() - latestStartedAt
+        });
         return true;
       } catch {
         return false;
@@ -573,9 +578,9 @@ export const createSurface = (
       latestNoteId = noteId;
       latestStartedAt = performance.now();
       // Snapshot text spans for change-location detection in paintRendered().
-      rerenderSnapshot = [
-        ...container.querySelectorAll<HTMLElement>('.typst-document .tsel')
-      ].map((el) => el.textContent ?? '');
+      rerenderSnapshot = [...container.querySelectorAll<HTMLElement>('.typst-document .tsel')].map(
+        (el) => el.textContent ?? ''
+      );
       // No loading state, no content replacement — existing render stays visible
       // until paintRendered() swaps in the new result.
       post({ type: 'compile', noteId, source, sourceFiles });
@@ -618,10 +623,7 @@ export const createSurface = (
         return false;
       }
 
-      container.scrollTop = Math.max(
-        0,
-        match.top - container.clientHeight * 0.35
-      );
+      container.scrollTop = Math.max(0, match.top - container.clientHeight * 0.35);
       emitPageStatus();
       return true;
     },
@@ -703,10 +705,7 @@ export const createSurface = (
 
     scrollRight(): void {
       const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
-      container.scrollLeft = Math.min(
-        maxScrollLeft,
-        container.scrollLeft + HORIZONTAL_SCROLL_PX
-      );
+      container.scrollLeft = Math.min(maxScrollLeft, container.scrollLeft + HORIZONTAL_SCROLL_PX);
       emitPageStatus();
     },
 
@@ -784,10 +783,7 @@ const getDomContentBounds = (documentNode: HTMLElement): ContentBounds | null =>
   return bounds;
 };
 
-const unionContentBounds = (
-  left: ContentBounds | null,
-  right: ContentBounds
-): ContentBounds => {
+const unionContentBounds = (left: ContentBounds | null, right: ContentBounds): ContentBounds => {
   if (!left) {
     return right;
   }

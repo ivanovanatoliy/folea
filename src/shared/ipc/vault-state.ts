@@ -44,7 +44,12 @@ export interface VaultStateFileV1 {
 }
 
 export type VaultStatePatch =
-  | { readonly type: 'noteOpened'; readonly relPath: VaultPath; readonly title: string; readonly openedAt: string }
+  | {
+      readonly type: 'noteOpened';
+      readonly relPath: VaultPath;
+      readonly title: string;
+      readonly openedAt: string;
+    }
   | { readonly type: 'positionChanged'; readonly position: NotePositionState }
   | { readonly type: 'commandExecuted'; readonly commandId: string }
   | { readonly type: 'removeMissingNotes'; readonly relPaths: readonly VaultPath[] };
@@ -184,13 +189,13 @@ export const parseNotePositionState = (value: unknown): NotePositionState => {
     scrollLeft: isFiniteNonNegativeNumber(value.scrollLeft) ? value.scrollLeft : 0,
     viewportHeight: isFiniteNonNegativeNumber(value.viewportHeight) ? value.viewportHeight : 0,
     contentHeight: isFiniteNonNegativeNumber(value.contentHeight) ? value.contentHeight : 0,
-    scrollRatio: typeof value.scrollRatio === 'number'
-      ? Math.max(0, Math.min(1, value.scrollRatio))
-      : 0,
+    scrollRatio:
+      typeof value.scrollRatio === 'number' ? Math.max(0, Math.min(1, value.scrollRatio)) : 0,
     zoomMode: parseNoteZoomMode(value.zoomMode),
-    zoomLevel: typeof value.zoomLevel === 'number' && Number.isFinite(value.zoomLevel)
-      ? Math.max(0.1, Math.min(10, value.zoomLevel))
-      : 1,
+    zoomLevel:
+      typeof value.zoomLevel === 'number' && Number.isFinite(value.zoomLevel)
+        ? Math.max(0.1, Math.min(10, value.zoomLevel))
+        : 1,
     caretSpanIndex: typeof caretSpanIndex === 'number' ? caretSpanIndex : null,
     updatedAt: parseIsoTimestamp(value.updatedAt, 'updatedAt')
   };
@@ -473,9 +478,10 @@ export const parseFoleaPrefs = (value: unknown): FoleaPrefs => {
     return { ...DEFAULT_PREFS };
   }
 
-  const theme = value.theme === 'system' || value.theme === 'dark' || value.theme === 'light'
-    ? value.theme
-    : DEFAULT_PREFS.theme;
+  const theme =
+    value.theme === 'system' || value.theme === 'dark' || value.theme === 'light'
+      ? value.theme
+      : DEFAULT_PREFS.theme;
 
   return {
     vaultCaseSensitive:

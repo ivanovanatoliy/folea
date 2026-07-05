@@ -284,7 +284,14 @@ const makeSetup = (overrideKeymap?: Map<string, string>) => {
       useDark: vi.fn().mockResolvedValue(undefined),
       cycle: vi.fn().mockResolvedValue(undefined)
     },
-    quickOpen: { open: vi.fn(), close: vi.fn(), moveNext: vi.fn(), movePrevious: vi.fn(), accept: vi.fn(), setQuery: vi.fn() },
+    quickOpen: {
+      open: vi.fn(),
+      close: vi.fn(),
+      moveNext: vi.fn(),
+      movePrevious: vi.fn(),
+      accept: vi.fn(),
+      setQuery: vi.fn()
+    },
     vault: { open: vi.fn(), close: vi.fn() }
   };
   const dispatcher = createDispatcher(stack, GLOBAL_KEYMAP, () => ctx);

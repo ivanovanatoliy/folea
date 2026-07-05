@@ -21,12 +21,8 @@ describe('buildLinkGraph — basic resolution', () => {
     const notes = [meta('a.typ', 'Note A'), meta('b.typ', 'Note B')];
     const graph = buildLinkGraph(files, notes);
 
-    expect(graph.outgoing('a.typ')).toEqual([
-      { relPath: 'b.typ', title: 'Note B', kind: 'link' }
-    ]);
-    expect(graph.backlinks('b.typ')).toEqual([
-      { relPath: 'a.typ', title: 'Note A', kind: 'link' }
-    ]);
+    expect(graph.outgoing('a.typ')).toEqual([{ relPath: 'b.typ', title: 'Note B', kind: 'link' }]);
+    expect(graph.backlinks('b.typ')).toEqual([{ relPath: 'a.typ', title: 'Note A', kind: 'link' }]);
   });
 
   it('resolves a relative ../path target', () => {
@@ -64,9 +60,7 @@ describe('buildLinkGraph — basic resolution', () => {
     const notes = [meta('a.typ'), meta('b.typ', 'B')];
     const graph = buildLinkGraph(files, notes);
 
-    expect(graph.outgoing('a.typ')).toEqual([
-      { relPath: 'b.typ', title: 'B', kind: 'link' }
-    ]);
+    expect(graph.outgoing('a.typ')).toEqual([{ relPath: 'b.typ', title: 'B', kind: 'link' }]);
   });
 
   it('resolves extension-less relative targets', () => {

@@ -18,7 +18,12 @@ type FakeElement = {
   readonly clientWidth: number;
   readonly clientHeight: number;
   readonly localName?: string;
-  readonly getBBox?: () => { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+  readonly getBBox?: () => {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  };
   readonly closest?: () => FakeElement | null;
   readonly getAttribute?: () => string | null;
   readonly getBoundingClientRect: () => { readonly left: number; readonly width: number };
@@ -62,15 +67,18 @@ const installGlobals = (devicePixelRatio: number): void => {
     devicePixelRatio,
     dispatchEvent: vi.fn()
   });
-  vi.stubGlobal('CustomEvent', class CustomEvent<T> {
-    readonly type: string;
-    readonly detail: T;
+  vi.stubGlobal(
+    'CustomEvent',
+    class CustomEvent<T> {
+      readonly type: string;
+      readonly detail: T;
 
-    constructor(type: string, init: { readonly detail: T }) {
-      this.type = type;
-      this.detail = init.detail;
+      constructor(type: string, init: { readonly detail: T }) {
+        this.type = type;
+        this.detail = init.detail;
+      }
     }
-  });
+  );
   vi.stubGlobal('getComputedStyle', () => ({
     paddingLeft: '32px',
     paddingRight: '32px',

@@ -13,10 +13,7 @@ import {
   type AppStateFileV1,
   type AppStatePatch
 } from '../shared/ipc/app-state';
-import {
-  EDITOR_OPEN_CHANNEL,
-  validateEditorOpenRelPath
-} from '../shared/ipc/editor';
+import { EDITOR_OPEN_CHANNEL, validateEditorOpenRelPath } from '../shared/ipc/editor';
 import {
   KEYS_CONFIG_LOAD_CHANNEL,
   parseKeysConfigLoadResponse,
@@ -39,10 +36,7 @@ import {
   type SearchOptions,
   type SearchResultEvent
 } from '../shared/ipc/search';
-import {
-  validateShellOpenExternalRequest,
-  type FoleaShellBridge
-} from '../shared/ipc/shell';
+import { validateShellOpenExternalRequest, type FoleaShellBridge } from '../shared/ipc/shell';
 import {
   createCreateNoteRequest,
   createDeleteNoteRequest,
@@ -298,10 +292,7 @@ const bridge: FoleaBridge = Object.freeze({
 
   shell: Object.freeze({
     openExternal: async (url: string): Promise<void> => {
-      await ipcRenderer.invoke(
-        'shell:openExternal',
-        validateShellOpenExternalRequest({ url })
-      );
+      await ipcRenderer.invoke('shell:openExternal', validateShellOpenExternalRequest({ url }));
     }
   }) as FoleaShellBridge
 });

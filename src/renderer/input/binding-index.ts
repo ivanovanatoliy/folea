@@ -4,18 +4,18 @@ import type { Keymap } from './keymap';
 export type BindingIndex = Map<string, string>;
 
 const CHORD_LABELS: Record<string, string> = {
-  'Escape': 'Esc',
-  'Enter': '↵',
-  'ArrowUp': '↑',
-  'ArrowDown': '↓',
-  'ArrowLeft': '←',
-  'ArrowRight': '→',
+  Escape: 'Esc',
+  Enter: '↵',
+  ArrowUp: '↑',
+  ArrowDown: '↓',
+  ArrowLeft: '←',
+  ArrowRight: '→',
   '<C-p>': 'C-p',
   '<C-n>': 'C-n',
   '<C-b>': 'C-b',
   '<C-d>': 'C-d',
   '<C-u>': 'C-u',
-  '<C-e>': 'C-e',
+  '<C-e>': 'C-e'
 };
 
 const formatChord = (chord: string): string => {

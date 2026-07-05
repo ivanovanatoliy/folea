@@ -27,11 +27,7 @@ const warn = (warnings: string[], message: string): void => {
   console.warn(message);
 };
 
-const parseBoolean = (
-  raw: string,
-  key: string,
-  warnings: string[]
-): boolean | undefined => {
+const parseBoolean = (raw: string, key: string, warnings: string[]): boolean | undefined => {
   const trimmed = raw.trim().toLowerCase();
   if (trimmed === 'true' || trimmed === '1') {
     return true;
@@ -116,9 +112,7 @@ export const mergePrefs = (
     DEFAULT_PREFS.inFileCaseSensitive,
   theme: vaultPrefs.theme ?? globalPrefs.theme ?? DEFAULT_PREFS.theme,
   editorCommand:
-    vaultPrefs.editorCommand ??
-    globalPrefs.editorCommand ??
-    DEFAULT_PREFS.editorCommand,
+    vaultPrefs.editorCommand ?? globalPrefs.editorCommand ?? DEFAULT_PREFS.editorCommand,
   warnings
 });
 

@@ -455,7 +455,10 @@ export const App = () => {
     }
   };
 
-  const openNoteWithState = async (relPath: string, vaultState?: VaultStateFileV1): Promise<void> => {
+  const openNoteWithState = async (
+    relPath: string,
+    vaultState?: VaultStateFileV1
+  ): Promise<void> => {
     await flushPosition();
     positionDebounce.dispose();
     const stateForRestore = vaultState ?? (await loadVaultStateOrDefault());
@@ -665,10 +668,9 @@ export const App = () => {
       setCommandHistory(vs.commandHistory);
 
       const noteSet = new Set(listedNotes.map((n) => n.relPath));
-      const missingPaths = [
-        ...vs.recentNotes.map((n) => n.relPath),
-        vs.lastOpenedNote
-      ].filter((rp): rp is string => rp !== null && !noteSet.has(rp));
+      const missingPaths = [...vs.recentNotes.map((n) => n.relPath), vs.lastOpenedNote].filter(
+        (rp): rp is string => rp !== null && !noteSet.has(rp)
+      );
 
       if (missingPaths.length > 0) {
         try {
@@ -747,8 +749,14 @@ export const App = () => {
     setRecentNotes([]);
     setCommandHistory([]);
     setStartupState('start-menu');
-    void window.folea.prefs.load().then(applyLoadedPrefs).catch(() => {});
-    window.folea.appState.load().then((s) => setRecentVaults(s.recentVaults)).catch(() => {});
+    void window.folea.prefs
+      .load()
+      .then(applyLoadedPrefs)
+      .catch(() => {});
+    window.folea.appState
+      .load()
+      .then((s) => setRecentVaults(s.recentVaults))
+      .catch(() => {});
   };
 
   const openVaultInteractive = async (rootPath?: string): Promise<void> => {
@@ -1143,8 +1151,7 @@ export const App = () => {
         popContext('quick-open');
       },
       moveNext: () => {
-        const count =
-          quickOpenMode() === 'recent' ? recentNotes().length : quickOpenHits().length;
+        const count = quickOpenMode() === 'recent' ? recentNotes().length : quickOpenHits().length;
         setQuickOpenSelectedIndex((i) => Math.min(i + 1, Math.max(0, count - 1)));
       },
       movePrevious: () => setQuickOpenSelectedIndex((i) => Math.max(0, i - 1)),
@@ -1225,14 +1232,38 @@ export const App = () => {
 
         return handled;
       },
-      moveDown: () => { caretEngine?.moveDown(); savePositionNow(); },
-      moveUp: () => { caretEngine?.moveUp(); savePositionNow(); },
-      moveLeft: () => { caretEngine?.moveLeft(); savePositionNow(); },
-      moveRight: () => { caretEngine?.moveRight(); savePositionNow(); },
-      moveToStart: () => { caretEngine?.moveToStart(); savePositionNow(); },
-      moveToEnd: () => { caretEngine?.moveToEnd(); savePositionNow(); },
-      jumpParaForward: () => { caretEngine?.jumpParaForward(); savePositionNow(); },
-      jumpParaBackward: () => { caretEngine?.jumpParaBackward(); savePositionNow(); },
+      moveDown: () => {
+        caretEngine?.moveDown();
+        savePositionNow();
+      },
+      moveUp: () => {
+        caretEngine?.moveUp();
+        savePositionNow();
+      },
+      moveLeft: () => {
+        caretEngine?.moveLeft();
+        savePositionNow();
+      },
+      moveRight: () => {
+        caretEngine?.moveRight();
+        savePositionNow();
+      },
+      moveToStart: () => {
+        caretEngine?.moveToStart();
+        savePositionNow();
+      },
+      moveToEnd: () => {
+        caretEngine?.moveToEnd();
+        savePositionNow();
+      },
+      jumpParaForward: () => {
+        caretEngine?.jumpParaForward();
+        savePositionNow();
+      },
+      jumpParaBackward: () => {
+        caretEngine?.jumpParaBackward();
+        savePositionNow();
+      },
       enterVisual: () => {
         if (contextStack.active()?.name !== 'caret') return false;
         const handled = caretEngine?.enterVisual() ?? false;
@@ -1329,8 +1360,12 @@ export const App = () => {
     };
 
     const vaultView: VaultView = {
-      open: () => { void openVaultInteractive(); },
-      close: () => { void closeVault(); }
+      open: () => {
+        void openVaultInteractive();
+      },
+      close: () => {
+        void closeVault();
+      }
     };
 
     const commandContext: CommandContext = {
@@ -1383,7 +1418,10 @@ export const App = () => {
       .then(setVersion)
       .catch(() => setVersion('unavailable'));
 
-    void window.folea.prefs.load().then(applyLoadedPrefs).catch(() => {});
+    void window.folea.prefs
+      .load()
+      .then(applyLoadedPrefs)
+      .catch(() => {});
     void performStartup();
 
     const unsubscribeVault = window.folea.vault.onChanged((event) => {
@@ -1492,7 +1530,9 @@ export const App = () => {
       void persistRenderCache(noteId, result);
     };
 
-    const scrollListener = (): void => { savePositionNow(); };
+    const scrollListener = (): void => {
+      savePositionNow();
+    };
 
     surfaceMount?.addEventListener('scroll', scrollListener, { passive: true });
 

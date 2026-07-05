@@ -27,7 +27,10 @@ describe('buildTerminalArgs', () => {
   it('uses FOLEA_EDITOR_CMD when set, replacing %FILE% token', () => {
     process.env.FOLEA_EDITOR_CMD = 'kitty -e nvim %FILE%';
     expect(buildTerminalArgs(SOCK, '/vault/note.typ')).toEqual([
-      'kitty', '-e', 'nvim', '/vault/note.typ'
+      'kitty',
+      '-e',
+      'nvim',
+      '/vault/note.typ'
     ]);
   });
 
@@ -51,14 +54,20 @@ describe('buildTerminalArgs', () => {
 
   it('uses configured editor.command when env override is absent', () => {
     expect(buildTerminalArgs(SOCK, '/vault/note.typ', 'alacritty -e nvim %FILE%')).toEqual([
-      'alacritty', '-e', 'nvim', '/vault/note.typ'
+      'alacritty',
+      '-e',
+      'nvim',
+      '/vault/note.typ'
     ]);
   });
 
   it('FOLEA_EDITOR_CMD overrides configured editor.command', () => {
     process.env.FOLEA_EDITOR_CMD = 'kitty -e nvim %FILE%';
     expect(buildTerminalArgs(SOCK, '/vault/note.typ', 'alacritty -e nvim %FILE%')).toEqual([
-      'kitty', '-e', 'nvim', '/vault/note.typ'
+      'kitty',
+      '-e',
+      'nvim',
+      '/vault/note.typ'
     ]);
   });
 

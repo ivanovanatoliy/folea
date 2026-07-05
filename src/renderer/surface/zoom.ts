@@ -109,7 +109,8 @@ export const createZoomController = (container: HTMLElement): ZoomController => 
       _artifactWidth = artifactWidth;
       _artifactHeight = artifactHeight;
       _numPages = Math.max(1, numPages);
-      _contentBounds = contentBounds ?? getVisibleContentBounds(svgElement, artifactWidth, artifactHeight);
+      _contentBounds =
+        contentBounds ?? getVisibleContentBounds(svgElement, artifactWidth, artifactHeight);
       this.reapply();
     },
     reapply(): void {
@@ -137,8 +138,7 @@ export const createZoomController = (container: HTMLElement): ZoomController => 
       }
 
       const style = getComputedStyle(container);
-      const paddingH =
-        parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+      const paddingH = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
       _snapAxis = 'width';
       _level = (container.clientWidth - paddingH) / _artifactWidth;
       applyLevel();
@@ -162,8 +162,7 @@ export const createZoomController = (container: HTMLElement): ZoomController => 
       }
 
       const style = getComputedStyle(container);
-      const paddingV =
-        parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+      const paddingV = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
       const singlePageHeight = _artifactHeight / _numPages;
       _snapAxis = 'height';
       _level = (container.clientHeight - paddingV) / singlePageHeight;
