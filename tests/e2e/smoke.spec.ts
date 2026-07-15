@@ -1,11 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
-import { _electron as electron, type ElectronApplication } from 'playwright';
+import type { ElectronApplication } from 'playwright';
 import { promises as fs } from 'node:fs';
-import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { createServer, type ViteDevServer } from 'vite';
 import solid from 'vite-plugin-solid';
+import { cleanupApp, currentEnv, expectSurfaceRendered, launchApp } from './support/electron';
 
 interface SecurityPreferences {
   readonly nodeIntegration: boolean | undefined;
@@ -17,21 +17,6 @@ interface SecurityPreferences {
 interface WebContentsWithPreferences {
   getLastWebPreferences(): SecurityPreferences;
 }
-
-let electronApp: ElectronApplication | undefined;
-
-const currentEnv = (): Record<string, string> =>
-  Object.fromEntries(
-    Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined)
-  );
-
-const launchApp = async (env = currentEnv()): Promise<ElectronApplication> => {
-  electronApp = await electron.launch({
-    args: [process.cwd()],
-    env
-  });
-  return electronApp;
-};
 
 const startRendererDevServer = async (): Promise<{ server: ViteDevServer; url: string }> => {
   const server = await createServer({
@@ -95,27 +80,6 @@ const expectNoCspViolations = async (
     .toEqual([]);
 };
 
-const expectSurfaceRendered = async (
-  page: Awaited<ReturnType<ElectronApplication['firstWindow']>>
-): Promise<void> => {
-  await expect
-    .poll(
-      async () => {
-        const surface = page.getByTestId('typst-surface');
-        const state = await surface.getAttribute('data-state');
-
-        if (state !== 'error') {
-          return state;
-        }
-
-        const errorText = await page.getByTestId('typst-render-error').textContent();
-        return `error: ${errorText}`;
-      },
-      { timeout: 10_000 }
-    )
-    .toBe('rendered');
-};
-
 const waitForSurfacePrefetched = (
   page: Awaited<ReturnType<ElectronApplication['firstWindow']>>,
   noteId: string
@@ -161,33 +125,7 @@ const selectTreeRow = async (
   throw new Error(`Unable to reach tree row: ${relPath}`);
 };
 
-test.afterEach(async () => {
-  if (electronApp) {
-    const proc = electronApp.process();
-    const pid = proc.pid;
-    await electronApp
-      .evaluate(async ({ app }) => {
-        app.quit();
-      })
-      .catch(() => undefined);
-    await Promise.race([
-      electronApp.close().catch(() => undefined),
-      new Promise<void>((resolve) => setTimeout(resolve, 5_000))
-    ]);
-    if (process.platform === 'win32' && pid != null) {
-      spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
-    } else {
-      try {
-        proc.kill();
-      } catch {
-        /* already exited */
-      }
-    }
-    // Give OS time to release handles before Playwright worker cleanup runs
-    await new Promise<void>((resolve) => setTimeout(resolve, 500));
-    electronApp = undefined;
-  }
-});
+test.afterEach(cleanupApp);
 
 test('opens the minimalist shell and bridge', async () => {
   const app = await launchApp();

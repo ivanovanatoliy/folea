@@ -1,0 +1,166 @@
+.start-menu {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--folea-surface-themed);
+}
+
+.start-menu-inner {
+  width: min(480px, calc(100vw - 64px));
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.start-menu-logo {
+  align-self: center;
+  width: min(260px, 72vw);
+  height: auto;
+  margin: 0 0 28px;
+  user-select: none;
+}
+
+.start-menu-section {
+  margin: 0 0 8px;
+  color: var(--folea-muted-strong);
+  font:
+    11px/1 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    'Liberation Mono',
+    monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.start-menu-vaults {
+  margin: 0 0 20px;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--folea-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.start-menu-vault-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--folea-row-border);
+  background: var(--folea-surface-themed);
+  color: inherit;
+}
+
+.start-menu-vaults li:last-child .start-menu-vault-row {
+  border-bottom: 0;
+}
+
+.start-menu-vault-row:hover,
+.start-menu-vault-row:focus-within {
+  background: var(--folea-bg);
+}
+
+.start-menu-vault-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 0 10px 14px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.start-menu-vault-remove {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  margin-right: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--folea-muted);
+  cursor: pointer;
+  position: relative;
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.start-menu-vault-row:hover .start-menu-vault-remove,
+.start-menu-vault-row:focus-within .start-menu-vault-remove {
+  opacity: 1;
+}
+
+.start-menu-vault-remove:hover,
+.start-menu-vault-remove:focus {
+  outline: none;
+  color: var(--folea-danger);
+}
+
+.start-menu-vault-remove::before,
+.start-menu-vault-remove::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 1px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.start-menu-vault-remove::before {
+  transform: rotate(45deg);
+}
+
+.start-menu-vault-remove::after {
+  transform: rotate(-45deg);
+}
+
+.start-menu-vault-name {
+  font:
+    13px/1.2 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  font-weight: 500;
+  color: var(--folea-text);
+}
+
+.start-menu-vault-path {
+  font:
+    11px/1.3 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    'Liberation Mono',
+    monospace;
+  color: var(--folea-muted-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.start-menu-open-link {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--folea-link);
+  cursor: pointer;
+  font:
+    13px/1 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.start-menu-open-link:hover {
+  text-decoration: underline;
+}

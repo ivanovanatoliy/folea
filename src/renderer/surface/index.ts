@@ -1,17 +1,29 @@
 import {
   type OutlineEntry,
-  parseTypstWorkerResult,
-  type CompileRequest,
   type CompileResult,
   type CompileSourceFiles,
   type Diagnostic
 } from '../../shared/worker/typst';
 import type { RenderCacheEntryV1 } from '../../shared/ipc/vault-state';
-import type { CaretEngine, LinkTarget } from './caret';
+import type { CaretEngine } from './caret';
 import { createCaretEngine } from './caret';
-import type { ContentBounds, ZoomState } from './zoom';
+import type { ZoomState } from './zoom';
 import { createZoomController } from './zoom';
 import { createTypstWorker } from '../shared/create-typst-worker';
+import { createSurfaceSearch } from './surface-search';
+import { createSurfaceScroll, type SurfacePageStatus } from './surface-scroll';
+import { installSurfaceLinkInterceptor } from './surface-links';
+import { createSurfaceWorkerClient } from './surface-worker-client';
+import {
+  createErrorDocument,
+  createRenderedDocument,
+  getDomContentBounds,
+  getRestoredRerenderScrollTop,
+  getScrollTopForChangedTarget
+} from './surface-renderer';
+export type { SurfaceLinkClickDetail } from './surface-links';
+export { getRestoredRerenderScrollTop, getScrollTopForChangedTarget } from './surface-renderer';
+export type { ChangedTargetRevealInput, RestoredRerenderScrollInput } from './surface-renderer';
 
 export interface SurfaceRenderedDetail {
   readonly noteId: string;
@@ -31,14 +43,7 @@ export interface SurfacePrefetchedDetail {
   readonly fromCache: boolean;
 }
 
-export interface SurfacePageStatusDetail {
-  readonly current: number;
-  readonly total: number;
-}
-
-export interface SurfaceLinkClickDetail {
-  readonly target: LinkTarget;
-}
+export type SurfacePageStatusDetail = SurfacePageStatus;
 
 export interface SurfaceCacheWriteDetail {
   readonly noteId: string;
@@ -92,9 +97,6 @@ export interface SurfaceController {
   getCaretEngine(): CaretEngine;
 }
 
-const LINE_SCROLL_PX = 40;
-const HORIZONTAL_SCROLL_PX = 80;
-
 interface SurfaceOptions {
   readonly createWorker?: () => Worker;
 }
@@ -105,7 +107,6 @@ export const createSurface = (
   container: HTMLElement,
   options: SurfaceOptions = {}
 ): SurfaceController => {
-  const worker = (options.createWorker ?? createDefaultWorker)();
   let controller!: SurfaceController;
   const zoomController = createZoomController(container);
   const caretEngine = createCaretEngine(
@@ -118,25 +119,7 @@ export const createSurface = (
   let disposed = false;
   let latestOutline: readonly OutlineEntry[] = [];
   let latestTextLayer: import('../../shared/worker/typst').TextLayerModel | undefined;
-  let lastSearchQuery: string | undefined;
-  let lastSearchIndex = -1;
-  let searchHighlight: HTMLDivElement | undefined;
   let rerenderSnapshot: string[] | null = null;
-  let textLayerTsels: readonly HTMLElement[] = [];
-  let pageStatusFrame: number | undefined;
-  let sourceVersion = 0;
-  const snapshotResolvers = new Map<
-    number,
-    { resolve: () => void; reject: (error: Error) => void }
-  >();
-  const updateResolvers = new Map<
-    number,
-    { resolve: (affected: readonly string[]) => void; reject: (error: Error) => void }
-  >();
-
-  const post = (request: CompileRequest): void => {
-    worker.postMessage(request);
-  };
 
   const setState = (state: string): void => {
     container.dataset.state = state;
@@ -158,117 +141,11 @@ export const createSurface = (
     );
   };
 
-  const getPageStatus = (): SurfacePageStatusDetail => {
-    if (container.clientHeight <= 0 || container.scrollHeight <= 0) {
-      return { current: 0, total: 0 };
-    }
-
-    const total = Math.max(1, Math.ceil(container.scrollHeight / container.clientHeight));
-    const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
-    const current =
-      maxScrollTop === 0
-        ? 1
-        : Math.min(
-            total,
-            Math.max(1, Math.round((container.scrollTop / maxScrollTop) * (total - 1)) + 1)
-          );
-
-    return { current, total };
-  };
-
-  const emitPageStatus = (): void => {
-    if (pageStatusFrame !== undefined) return;
-    pageStatusFrame = requestAnimationFrame(() => {
-      pageStatusFrame = undefined;
-      window.dispatchEvent(
-        new CustomEvent<SurfacePageStatusDetail>('folea:surface-page-status', {
-          detail: getPageStatus()
-        })
-      );
-    });
-  };
-
-  const removeSearchHighlight = (): void => {
-    searchHighlight?.remove();
-    searchHighlight = undefined;
-  };
-
-  const clearSearchHighlight = (): void => {
-    removeSearchHighlight();
-    lastSearchIndex = -1;
-  };
+  const scroll = createSurfaceScroll(container);
+  const search = createSurfaceSearch(container, scroll.emitStatus);
 
   const getTextLayer = (): import('../../shared/worker/typst').TextLayerModel | undefined =>
     latestTextLayer;
-
-  const getTextLayerTsels = (): readonly HTMLElement[] => textLayerTsels;
-
-  const rebuildTextLayerIndex = (): void => {
-    textLayerTsels = [...container.querySelectorAll<HTMLElement>('.typst-document .tsel')];
-  };
-
-  const setSearchHighlight = (index: number): boolean => {
-    const documentNode = container.querySelector<HTMLElement>('.typst-document');
-    const tsel = getTextLayerTsels()[index];
-    if (!documentNode || !tsel) {
-      return false;
-    }
-
-    removeSearchHighlight();
-
-    const rect = tsel.getBoundingClientRect();
-    const docRect = documentNode.getBoundingClientRect();
-    const highlight = document.createElement('div');
-    highlight.className = 'surface-search-highlight';
-    highlight.dataset.testid = 'surface-search-highlight';
-    highlight.style.left = `${rect.left - docRect.left}px`;
-    highlight.style.top = `${rect.top - docRect.top}px`;
-    highlight.style.width = `${Math.max(4, rect.width)}px`;
-    highlight.style.height = `${Math.max(12, rect.height)}px`;
-    documentNode.append(highlight);
-    searchHighlight = highlight;
-    lastSearchIndex = index;
-    return true;
-  };
-
-  const searchSpans = (forward: boolean): boolean => {
-    const query = lastSearchQuery?.trim().toLowerCase();
-    const tsels = getTextLayerTsels();
-    if (!query || tsels.length === 0) {
-      return false;
-    }
-
-    const count = tsels.length;
-    const start =
-      lastSearchIndex >= 0 ? lastSearchIndex + (forward ? 1 : -1) : forward ? 0 : count - 1;
-    const normalizedStart = ((start % count) + count) % count;
-
-    for (let offset = 0; offset < count; offset += 1) {
-      const index = forward
-        ? (normalizedStart + offset) % count
-        : (normalizedStart - offset + count) % count;
-      const tsel = tsels[index];
-      if (tsel?.textContent?.toLowerCase().includes(query)) {
-        if (!setSearchHighlight(index)) {
-          return false;
-        }
-
-        const rect = tsel.getBoundingClientRect();
-        container.scrollTop = Math.max(
-          0,
-          rect.top -
-            container.getBoundingClientRect().top +
-            container.scrollTop -
-            container.clientHeight * 0.35
-        );
-        emitPageStatus();
-
-        return true;
-      }
-    }
-
-    return false;
-  };
 
   const paintRendered = (result: Extract<CompileResult, { type: 'rendered' }>): void => {
     const durationMs = performance.now() - latestStartedAt;
@@ -280,22 +157,16 @@ export const createSurface = (
     const prevScrollTop = wasRendered ? container.scrollTop : 0;
     const prevScrollHeight = wasRendered ? container.scrollHeight : 0;
 
-    const svgElement = parseSvgElement(result.artifact.svg);
-    const documentNode = document.createElement('div');
-    documentNode.className = 'typst-document';
-    documentNode.dataset.testid = 'typst-rendered-document';
-    documentNode.style.width = `${result.artifact.width}px`;
-    documentNode.style.minHeight = `${result.artifact.height}px`;
-    documentNode.replaceChildren(svgElement);
+    const { documentNode, svgElement } = createRenderedDocument(result.artifact);
     container.replaceChildren(documentNode);
-    rebuildTextLayerIndex();
+    search.rebuildIndex();
     container.dataset.cacheKey = result.cacheKey;
     container.dataset.fromCache = String(result.fromCache);
     container.dataset.durationMs = String(durationMs);
     latestOutline = result.outline;
     latestTextLayer = result.textLayer;
     caretEngine.setTextLayer(result.textLayer, container, latestNoteId);
-    clearSearchHighlight();
+    search.clearHighlight();
     zoomController.setArtifact(
       documentNode,
       svgElement,
@@ -320,7 +191,7 @@ export const createSurface = (
         container.scrollTop = restoredScrollTop;
       }
 
-      const newTsels = getTextLayerTsels();
+      const newTsels = [...container.querySelectorAll<HTMLElement>('.typst-document .tsel')];
       let changeEl: HTMLElement | undefined;
       const limit = Math.max(snapshot.length, newTsels.length);
       for (let i = 0; i < limit; i++) {
@@ -353,7 +224,7 @@ export const createSurface = (
     }
 
     setState('rendered');
-    emitPageStatus();
+    scroll.emitStatus();
 
     emitRendered({
       noteId: result.noteId,
@@ -364,70 +235,26 @@ export const createSurface = (
   };
 
   const showError = (diagnostics: readonly Diagnostic[], noteId = latestNoteId): void => {
-    const errorNode = document.createElement('div');
-    errorNode.className = 'typst-error';
-    errorNode.dataset.testid = 'typst-render-error';
-    errorNode.setAttribute('role', 'alert');
-
-    const title = document.createElement('div');
-    title.className = 'typst-error-title';
-    title.textContent = 'Typst compile error';
-    errorNode.append(title);
-
-    const list = document.createElement('ol');
-    list.className = 'typst-error-list';
-
     const renderedDiagnostics =
       diagnostics.length > 0
         ? diagnostics
         : [{ severity: 'error' as const, message: 'Unknown Typst compile error' }];
-
-    for (const diagnostic of renderedDiagnostics) {
-      const item = document.createElement('li');
-      const location =
-        diagnostic.path || diagnostic.range
-          ? `${diagnostic.path ?? ''}${diagnostic.range ? ` ${diagnostic.range}` : ''}: `
-          : '';
-      item.textContent = `${diagnostic.severity}: ${location}${diagnostic.message}`;
-      list.append(item);
-    }
-
-    errorNode.append(list);
-    container.replaceChildren(errorNode);
-    textLayerTsels = [];
+    container.replaceChildren(createErrorDocument(renderedDiagnostics));
+    search.clearIndex();
     latestOutline = [];
     latestTextLayer = undefined;
-    clearSearchHighlight();
     container.dataset.fromCache = 'false';
     container.dataset.durationMs = String(performance.now() - latestStartedAt);
     delete container.dataset.cacheKey;
     setState('error');
-    emitPageStatus();
+    scroll.emitStatus();
 
     if (noteId) {
       emitError({ noteId, diagnostics: renderedDiagnostics });
     }
   };
 
-  const onMessage = (event: MessageEvent<unknown>): void => {
-    const result = parseTypstWorkerResult(event.data);
-
-    if (result.type === 'snapshotSynced') {
-      sourceVersion = result.version;
-      snapshotResolvers.get(result.version)?.resolve();
-      snapshotResolvers.delete(result.version);
-      return;
-    }
-
-    if (result.type === 'filesUpdated') {
-      sourceVersion = result.version;
-      updateResolvers.get(result.version)?.resolve(result.affectedNoteIds);
-      updateResolvers.delete(result.version);
-      return;
-    }
-
-    if (result.version !== sourceVersion) return;
-
+  const onWorkerResult = (result: CompileResult): void => {
     if (result.type === 'prefetched') {
       emitPrefetched({
         noteId: result.noteId,
@@ -476,85 +303,27 @@ export const createSurface = (
     }
   };
 
-  const dispatchLinkHref = (href: string): void => {
-    let target: LinkTarget;
-    if (href.startsWith('#')) {
-      target = { kind: 'anchor', id: href.slice(1) };
-    } else if (href.startsWith('http://') || href.startsWith('https://')) {
-      target = { kind: 'external', url: href };
-    } else {
-      // Relative link. Typst #link() hrefs are relative to the linking note's directory,
-      // not the page base URL, and may omit the .typ extension. Resolution needs the note
-      // list, which only App has — carry the raw href + source note and resolve there.
-      target = { kind: 'note', rawHref: href, fromRelPath: latestNoteId ?? '' };
-    }
-    window.dispatchEvent(
-      new CustomEvent<SurfaceLinkClickDetail>('folea:surface-link-click', { detail: { target } })
-    );
-  };
+  const workerClient = createSurfaceWorkerClient({
+    createWorker: options.createWorker ?? createDefaultWorker,
+    onResult: onWorkerResult,
+    onError: (error) =>
+      showError([{ severity: 'error', message: `Typst worker error: ${error.message}` }])
+  });
 
-  // Typst SVG uses xlink:href (SVG 1.1), not bare href. CSS [href] selectors still
-  // match in Blink (namespace-unaware), but getAttribute('href') returns null.
-  const svgAnchorHref = (anchor: Element): string =>
-    anchor.getAttribute('href') ?? anchor.getAttribute('xlink:href') ?? '';
+  const removeLinkInterceptor = installSurfaceLinkInterceptor(container, () => latestNoteId);
 
-  // Single capture-phase listener handles all link clicks regardless of which child
-  // element is the target. Capture fires before Chromium processes SVG <a> link activation;
-  // stopImmediatePropagation kills other handlers so the new-window path never runs.
-  // 'auxclick' covers middle-button clicks which fire auxclick, not click, in Chromium.
-  const interceptLinkClick = (event: Event): void => {
-    const target = event.target as Element | null;
-    if (!target) return;
-
-    // Walk up from click target to find the nearest <a> ancestor.
-    let anchor: Element | null = target.closest('a');
-
-    // Fallback: if clicked element is not a DOM descendant of <a> but is
-    // geometrically over a link area (can happen with tsel divs in foreignObject),
-    // find the <a> by checking bounding rects.
-    if (!anchor) {
-      const { clientX: x, clientY: y } = event as MouseEvent;
-      for (const a of container.querySelectorAll<Element>('a')) {
-        const r = a.getBoundingClientRect();
-        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-          anchor = a;
-          break;
-        }
-      }
-    }
-
-    if (!anchor) return;
-    const href = svgAnchorHref(anchor);
-    if (!href) return;
-
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    dispatchLinkHref(href);
-  };
-  container.addEventListener('click', interceptLinkClick, { capture: true });
-  container.addEventListener('auxclick', interceptLinkClick, { capture: true });
-
-  worker.addEventListener('message', onMessage);
-  container.addEventListener('scroll', emitPageStatus);
+  container.addEventListener('scroll', scroll.emitStatus);
   const handleResize = (): void => {
-    emitPageStatus();
+    scroll.emitStatus();
     zoomController.reapply();
   };
-  const handleZoomChanged = (): void => {
-    if (lastSearchIndex >= 0) {
-      void setSearchHighlight(lastSearchIndex);
-    }
-  };
+  const handleZoomChanged = (): void => search.reapplyHighlight();
   window.addEventListener('resize', handleResize);
   window.addEventListener('folea:zoom-changed', handleZoomChanged);
 
   controller = {
     syncSnapshot(version: number, sourceFiles: CompileSourceFiles): Promise<void> {
-      if (disposed) return Promise.reject(new Error('Surface is disposed'));
-      return new Promise((resolve, reject) => {
-        snapshotResolvers.set(version, { resolve, reject });
-        post({ type: 'syncSnapshot', version, files: sourceFiles });
-      });
+      return workerClient.syncSnapshot(version, sourceFiles);
     },
 
     updateFiles(
@@ -562,20 +331,16 @@ export const createSurface = (
       changed: CompileSourceFiles,
       deleted: readonly string[]
     ): Promise<readonly string[]> {
-      if (disposed) return Promise.reject(new Error('Surface is disposed'));
-      return new Promise((resolve, reject) => {
-        updateResolvers.set(version, { resolve, reject });
-        post({ type: 'updateFiles', version, changed, deleted });
-      });
+      return workerClient.updateFiles(version, changed, deleted);
     },
 
     registerDependencies(noteId: string, dependencies: readonly string[]): void {
-      if (!disposed) post({ type: 'registerDependencies', noteId, dependencies });
+      if (!disposed) workerClient.registerDependencies(noteId, dependencies);
     },
 
     recompile(noteIds: readonly string[]): void {
       if (disposed) return;
-      for (const noteId of noteIds) post({ type: 'compile', noteId, version: sourceVersion });
+      for (const noteId of noteIds) workerClient.compile(noteId);
     },
 
     render(noteId: string): void {
@@ -587,34 +352,28 @@ export const createSurface = (
       latestStartedAt = performance.now();
       rerenderSnapshot = null;
       setState('loading');
-      emitPageStatus();
-      post({ type: 'compile', noteId, version: sourceVersion });
+      scroll.emitStatus();
+      workerClient.compile(noteId);
     },
 
     renderFromCache(noteId: string, cacheKey: string, entry: RenderCacheEntryV1): boolean {
       if (disposed) return false;
 
       try {
-        const svgElement = parseSvgElement(entry.artifact.svg);
-        const documentNode = document.createElement('div');
-        documentNode.className = 'typst-document';
-        documentNode.dataset.testid = 'typst-rendered-document';
-        documentNode.style.width = `${entry.artifact.width}px`;
-        documentNode.style.minHeight = `${entry.artifact.height}px`;
-        documentNode.replaceChildren(svgElement);
+        const { documentNode, svgElement } = createRenderedDocument(entry.artifact);
 
         latestNoteId = noteId;
         latestStartedAt = performance.now();
         rerenderSnapshot = null;
         container.replaceChildren(documentNode);
-        rebuildTextLayerIndex();
+        search.rebuildIndex();
         container.dataset.cacheKey = cacheKey;
         container.dataset.fromCache = 'true';
         container.dataset.durationMs = '0';
         latestOutline = entry.outline;
         latestTextLayer = entry.textLayer;
         caretEngine.setTextLayer(entry.textLayer, container, noteId);
-        clearSearchHighlight();
+        search.clearHighlight();
         zoomController.setArtifact(
           documentNode,
           svgElement,
@@ -624,7 +383,7 @@ export const createSurface = (
           getDomContentBounds(documentNode)
         );
         setState('rendered');
-        emitPageStatus();
+        scroll.emitStatus();
         emitRendered({
           noteId,
           cacheKey,
@@ -643,21 +402,21 @@ export const createSurface = (
       latestNoteId = noteId;
       latestStartedAt = performance.now();
       // Snapshot text spans for change-location detection in paintRendered().
-      rerenderSnapshot = getTextLayerTsels().map((el) => el.textContent ?? '');
+      rerenderSnapshot = search.snapshotText();
       // No loading state, no content replacement — existing render stays visible
       // until paintRendered() swaps in the new result.
-      post({ type: 'compile', noteId, version: sourceVersion });
+      workerClient.compile(noteId);
     },
 
     prefetch(noteId: string): void {
       if (!disposed) {
-        post({ type: 'prefetch', noteId, version: sourceVersion });
+        workerClient.prefetch(noteId);
       }
     },
 
     invalidate(noteId: string): void {
       if (!disposed) {
-        post({ type: 'invalidate', noteId });
+        workerClient.invalidate(noteId);
       }
     },
 
@@ -670,35 +429,21 @@ export const createSurface = (
     },
 
     revealSearchTarget(target: SurfaceSearchTarget): boolean {
-      lastSearchQuery = target.query.trim();
-      const match = findRenderedSearchMatch(container, target, getTextLayerTsels());
-      if (!match) {
-        clearSearchHighlight();
-        return false;
-      }
-
-      const success = setSearchHighlight(match.index);
-      if (!success) {
-        return false;
-      }
-
-      container.scrollTop = Math.max(0, match.top - container.clientHeight * 0.35);
-      emitPageStatus();
-      return true;
+      return search.revealTarget(target);
     },
 
-    clearSearchHighlight,
+    clearSearchHighlight: search.clearHighlight,
 
     setLastSearchQuery(query: string): void {
-      lastSearchQuery = query.trim();
+      search.setQuery(query);
     },
 
     nextMatch(): boolean {
-      return searchSpans(true);
+      return search.nextMatch();
     },
 
     prevMatch(): boolean {
-      return searchSpans(false);
+      return search.prevMatch();
     },
 
     showError,
@@ -708,14 +453,13 @@ export const createSurface = (
       latestOutline = [];
       latestTextLayer = undefined;
       caretEngine.dispose();
-      clearSearchHighlight();
+      search.clearIndex();
       container.replaceChildren();
-      textLayerTsels = [];
       container.dataset.fromCache = 'false';
       delete container.dataset.durationMs;
       delete container.dataset.cacheKey;
       setState('empty');
-      emitPageStatus();
+      scroll.emitStatus();
     },
 
     dispose(): void {
@@ -724,56 +468,42 @@ export const createSurface = (
       }
 
       disposed = true;
-      const disposedError = new Error('Surface is disposed');
-      for (const pending of snapshotResolvers.values()) pending.reject(disposedError);
-      for (const pending of updateResolvers.values()) pending.reject(disposedError);
-      snapshotResolvers.clear();
-      updateResolvers.clear();
-      if (pageStatusFrame !== undefined) cancelAnimationFrame(pageStatusFrame);
-      pageStatusFrame = undefined;
+      workerClient.dispose();
+      scroll.dispose();
       caretEngine.dispose();
-      worker.removeEventListener('message', onMessage);
-      container.removeEventListener('scroll', emitPageStatus);
+      container.removeEventListener('scroll', scroll.emitStatus);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('folea:zoom-changed', handleZoomChanged);
-      worker.terminate();
+      removeLinkInterceptor();
       container.replaceChildren();
     },
 
     scrollByLines(n: number): void {
-      container.scrollTop += n * LINE_SCROLL_PX;
-      emitPageStatus();
+      scroll.byLines(n);
     },
 
     scrollByViewport(fraction: number): void {
-      container.scrollTop += container.clientHeight * fraction;
-      emitPageStatus();
+      scroll.byViewport(fraction);
     },
 
     scrollToStart(): void {
-      container.scrollTop = 0;
-      emitPageStatus();
+      scroll.toStart();
     },
 
     scrollToEnd(): void {
-      container.scrollTop = container.scrollHeight;
-      emitPageStatus();
+      scroll.toEnd();
     },
 
     scrollToOffset(y: number): void {
-      container.scrollTop = Math.max(0, y);
-      emitPageStatus();
+      scroll.toOffset(y);
     },
 
     scrollLeft(): void {
-      container.scrollLeft = Math.max(0, container.scrollLeft - HORIZONTAL_SCROLL_PX);
-      emitPageStatus();
+      scroll.left();
     },
 
     scrollRight(): void {
-      const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
-      container.scrollLeft = Math.min(maxScrollLeft, container.scrollLeft + HORIZONTAL_SCROLL_PX);
-      emitPageStatus();
+      scroll.right();
     },
 
     zoomIn(): void {
@@ -812,173 +542,3 @@ export const createSurface = (
   controller.clear();
   return controller;
 };
-
-const parseSvgElement = (svg: string): SVGElement => {
-  const parsed = new DOMParser().parseFromString(svg, 'image/svg+xml');
-  const parserError = parsed.querySelector('parsererror');
-  const root = parsed.documentElement;
-
-  if (
-    parserError ||
-    root.namespaceURI !== 'http://www.w3.org/2000/svg' ||
-    root.localName !== 'svg'
-  ) {
-    throw new Error('Typst renderer returned invalid SVG');
-  }
-
-  return document.adoptNode(root) as unknown as SVGElement;
-};
-
-const getDomContentBounds = (documentNode: HTMLElement): ContentBounds | null => {
-  const documentRect = documentNode.getBoundingClientRect();
-  let bounds: ContentBounds | null = null;
-
-  for (const element of documentNode.querySelectorAll<HTMLElement>('.tsel')) {
-    const rect = element.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) {
-      continue;
-    }
-
-    bounds = unionContentBounds(bounds, {
-      x: rect.left - documentRect.left,
-      y: rect.top - documentRect.top,
-      width: rect.width,
-      height: rect.height
-    });
-  }
-
-  return bounds;
-};
-
-const unionContentBounds = (left: ContentBounds | null, right: ContentBounds): ContentBounds => {
-  if (!left) {
-    return right;
-  }
-
-  const x1 = Math.min(left.x, right.x);
-  const y1 = Math.min(left.y, right.y);
-  const x2 = Math.max(left.x + left.width, right.x + right.width);
-  const y2 = Math.max(left.y + left.height, right.y + right.height);
-  return { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
-};
-
-export interface ChangedTargetRevealInput {
-  readonly viewportTop: number;
-  readonly viewportHeight: number;
-  readonly currentScrollTop: number;
-  readonly targetTop: number;
-  readonly targetBottom: number;
-}
-
-export interface RestoredRerenderScrollInput {
-  readonly previousScrollTop: number;
-  readonly previousScrollHeight: number;
-  readonly nextScrollHeight: number;
-}
-
-export const getRestoredRerenderScrollTop = ({
-  previousScrollTop,
-  previousScrollHeight,
-  nextScrollHeight
-}: RestoredRerenderScrollInput): number | null => {
-  if (previousScrollHeight <= 0 || nextScrollHeight <= 0) {
-    return null;
-  }
-
-  return Math.round((previousScrollTop / previousScrollHeight) * nextScrollHeight);
-};
-
-export const getScrollTopForChangedTarget = ({
-  viewportTop,
-  viewportHeight,
-  currentScrollTop,
-  targetTop,
-  targetBottom
-}: ChangedTargetRevealInput): number | null => {
-  const viewportBottom = viewportTop + viewportHeight;
-  const isVisible = targetBottom > viewportTop && targetTop < viewportBottom;
-  if (isVisible) {
-    return null;
-  }
-
-  const targetTopInContent = targetTop - viewportTop + currentScrollTop;
-  return Math.max(0, Math.round(targetTopInContent - viewportHeight * 0.4));
-};
-
-interface RenderedSearchMatch {
-  readonly index: number;
-  readonly left: number;
-  readonly top: number;
-  readonly width: number;
-  readonly height: number;
-}
-
-const findRenderedSearchMatch = (
-  container: HTMLElement,
-  target: SurfaceSearchTarget,
-  candidates: readonly HTMLElement[] = [
-    ...container.querySelectorAll<HTMLElement>('.typst-document .tsel')
-  ]
-): RenderedSearchMatch | undefined => {
-  const documentNode = container.querySelector<HTMLElement>('.typst-document');
-  if (!documentNode) {
-    return undefined;
-  }
-
-  const query = normalizeSearchText(target.query);
-  const preview = normalizeSearchText(stripTypstMarkup(target.preview ?? ''));
-  if (query.length === 0) {
-    return undefined;
-  }
-
-  const matchIndex =
-    findTextCandidateIndex(candidates, preview) ??
-    findTextCandidateIndex(candidates, query) ??
-    findTextCandidateIndex(
-      candidates,
-      normalizeSearchText((target.preview ?? '').replace(/^=+\s*/, ''))
-    );
-
-  if (matchIndex === undefined) {
-    return undefined;
-  }
-
-  const match = candidates[matchIndex];
-  if (!match) {
-    return undefined;
-  }
-
-  const matchRect = match.getBoundingClientRect();
-  const documentRect = documentNode.getBoundingClientRect();
-
-  return {
-    index: matchIndex,
-    left: Math.max(0, matchRect.left - documentRect.left),
-    top: Math.max(0, matchRect.top - documentRect.top),
-    width: Math.max(4, matchRect.width),
-    height: Math.max(12, matchRect.height)
-  };
-};
-
-const findTextCandidateIndex = (
-  candidates: readonly HTMLElement[],
-  needle: string
-): number | undefined => {
-  if (needle.length === 0) {
-    return undefined;
-  }
-
-  const index = candidates.findIndex((candidate) =>
-    normalizeSearchText(candidate.textContent ?? '').includes(needle)
-  );
-  return index >= 0 ? index : undefined;
-};
-
-const stripTypstMarkup = (value: string): string =>
-  value
-    .replace(/^=+\s*/, '')
-    .replace(/#(?:\w|-)+/g, '')
-    .trim();
-
-const normalizeSearchText = (value: string): string =>
-  value.replace(/\s+/g, ' ').trim().toLowerCase();

@@ -1,75 +1,10 @@
 import { expect, test } from '@playwright/test';
-import { _electron as electron, type ElectronApplication } from 'playwright';
 import { promises as fs } from 'node:fs';
-import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
+import { cleanupApp, currentEnv, expectSurfaceRendered, launchApp } from './support/electron';
 
-let electronApp: ElectronApplication | undefined;
-
-const currentEnv = (): Record<string, string> =>
-  Object.fromEntries(
-    Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined)
-  );
-
-const launchApp = async (
-  env = currentEnv(),
-  extraArgs: string[] = []
-): Promise<ElectronApplication> => {
-  electronApp = await electron.launch({
-    args: [process.cwd(), ...extraArgs],
-    env
-  });
-  return electronApp;
-};
-
-const expectSurfaceRendered = async (
-  page: Awaited<ReturnType<ElectronApplication['firstWindow']>>
-): Promise<void> => {
-  await expect
-    .poll(
-      async () => {
-        const surface = page.getByTestId('typst-surface');
-        const state = await surface.getAttribute('data-state');
-
-        if (state !== 'error') {
-          return state;
-        }
-
-        const errorText = await page.getByTestId('typst-render-error').textContent();
-        return `error: ${errorText}`;
-      },
-      { timeout: 20_000 }
-    )
-    .toBe('rendered');
-};
-
-test.afterEach(async () => {
-  if (electronApp) {
-    const proc = electronApp.process();
-    const pid = proc.pid;
-    await electronApp
-      .evaluate(async ({ app }) => {
-        app.quit();
-      })
-      .catch(() => undefined);
-    await Promise.race([
-      electronApp.close().catch(() => undefined),
-      new Promise<void>((resolve) => setTimeout(resolve, 5_000))
-    ]);
-    if (process.platform === 'win32' && pid != null) {
-      spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
-    } else {
-      try {
-        proc.kill();
-      } catch {
-        /* already exited */
-      }
-    }
-    await new Promise<void>((resolve) => setTimeout(resolve, 500));
-    electronApp = undefined;
-  }
-});
+test.afterEach(cleanupApp);
 
 test('shows start menu when no vault is configured', async () => {
   const userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'folea-e2e-userdata-'));
@@ -81,6 +16,16 @@ test('shows start menu when no vault is configured', async () => {
     await expect(page.getByTestId('start-menu')).toBeVisible();
     await expect(page.getByTestId('start-menu-vault-row')).toHaveCount(0);
     await expect(page.getByTestId('start-menu-open-link')).toBeVisible();
+    await page.keyboard.press('Tab');
+    await expect(page.getByTestId('start-menu-open-link')).toBeFocused();
+    await expect
+      .poll(() =>
+        page.getByTestId('start-menu-open-link').evaluate((element) => {
+          const style = getComputedStyle(element);
+          return `${style.outlineStyle}:${style.outlineWidth}`;
+        })
+      )
+      .not.toBe('none:0px');
   } finally {
     await fs.rm(userDataDir, { recursive: true, force: true }).catch(() => {});
   }

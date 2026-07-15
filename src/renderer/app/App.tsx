@@ -68,8 +68,14 @@ import {
   type KeymapSet
 } from '../../shared/keys-config';
 import { dispatchSmartJump } from '../nav';
-import { createLinkGraphIndex, resolveNoteHref } from '../nav/link-graph';
-import type { LinkGraph, LinkGraphIndex, NoteRef } from '../nav/link-graph';
+import type { LinkGraph, NoteRef } from '../nav/link-graph';
+import { createLinkController } from '../features/links/create-link-controller';
+import type { LinkController } from '../features/links/create-link-controller';
+import {
+  createSourceSyncController,
+  type SourceSyncController
+} from '../features/vault/create-source-sync-controller';
+import { createVaultOperations } from '../features/vault-operations/create-vault-operations';
 import { findLocalSearchHits, type SearchScope } from '../search';
 import {
   createSurface,
@@ -84,15 +90,8 @@ import type { ZoomState } from '../surface/zoom';
 import { type CaretEngine } from '../surface/caret';
 import { VaultIndex } from '../vault';
 import { assertSafeRelativePosixPath } from '../../shared/path';
-import { rewriteTypstReferences } from '../../shared/typst-links';
 import type { SearchHit } from '../../shared/ipc/search';
-import {
-  parseVaultEntryName,
-  type NoteMeta,
-  type VaultChange,
-  type VaultDirectory,
-  type VaultTemplate
-} from '../../shared/ipc/vault';
+import { type NoteMeta, type VaultDirectory, type VaultTemplate } from '../../shared/ipc/vault';
 import type { CompileSourceFiles, OutlineEntry } from '../../shared/worker/typst';
 import type {
   FoleaPrefs,
@@ -234,16 +233,12 @@ export const App = () => {
   let surfaceMount: HTMLDivElement | undefined;
   let surface: SurfaceController | undefined;
   let caretEngine: CaretEngine | undefined;
-  let renderSourceFiles: Map<string, string> | undefined;
-  let renderSourceVersion = 0;
-  let linkGraphIndex: LinkGraphIndex | undefined;
+  let sourceController!: SourceSyncController;
+  let linkController!: LinkController;
   let detachKeyListener: (() => void) | undefined;
   let prefetchTimer: ReturnType<typeof setTimeout> | undefined;
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
   let quickOpenSearchTimer: ReturnType<typeof setTimeout> | undefined;
-  let sourceDeltaTimer: ReturnType<typeof setTimeout> | undefined;
-  let sourceDeltaTail: Promise<void> = Promise.resolve();
-  const pendingSourceChanges = new Map<string, VaultChange>();
   let prefetchInFlight = false;
   let queuedPrefetchRelPath: string | undefined;
   let pendingSearchTarget: (SurfaceSearchTarget & { readonly relPath: string }) | undefined;
@@ -389,103 +384,6 @@ export const App = () => {
       clearTimeout(quickOpenSearchTimer);
       quickOpenSearchTimer = undefined;
     }
-  };
-
-  const readTypstSourceFiles = async (): Promise<CompileSourceFiles> => {
-    if (renderSourceFiles) {
-      return renderSourceFiles;
-    }
-
-    try {
-      renderSourceFiles = new Map(
-        (await window.folea.vault.renderFiles()).map((file) => [file.relPath, file.contents])
-      );
-      return renderSourceFiles;
-    } catch (error) {
-      console.debug('Unable to read Typst render dependency snapshot', error);
-      return new Map<string, string>();
-    }
-  };
-
-  const applySourceDeltaBatch = async (events: readonly VaultChange[]): Promise<void> => {
-    const sourceFiles = renderSourceFiles;
-    if (!sourceFiles || events.some((event) => event.kind === 'structural')) {
-      await refreshVault();
-      return;
-    }
-
-    const changed = new Map<string, string>();
-    const deleted: string[] = [];
-    for (const event of events) {
-      if (event.kind === 'deleted') {
-        deleted.push(event.relPath);
-        continue;
-      }
-      if (event.kind === 'created' || event.kind === 'changed') {
-        try {
-          changed.set(
-            event.note.relPath,
-            await window.folea.vault.read({ relPath: event.note.relPath })
-          );
-        } catch {
-          deleted.push(event.note.relPath);
-        }
-      }
-    }
-
-    for (const [path, source] of changed) sourceFiles.set(path, source);
-    for (const path of deleted) sourceFiles.delete(path);
-    const version = ++renderSourceVersion;
-    const affected =
-      (await surface?.updateFiles(version, changed, deleted)) ?? ([] as readonly string[]);
-    window.dispatchEvent(
-      new CustomEvent('folea:source-synced', {
-        detail: {
-          kind: 'delta',
-          version,
-          changedCount: changed.size,
-          deletedCount: deleted.length,
-          totalFileCount: sourceFiles.size,
-          affectedNoteIds: affected
-        }
-      })
-    );
-    const currentRelPath = selectedRelPath();
-    const currentSource = changed.get(currentRelPath);
-    if (currentSource !== undefined) {
-      setCurrentSource(currentSource);
-      surface?.rerender(currentRelPath);
-    } else if (deleted.includes(currentRelPath)) {
-      const generation = ++navigationGeneration;
-      await renderSelectedNote(generation, notes());
-    } else if (affected.includes(currentRelPath)) {
-      surface?.rerender(currentRelPath);
-    }
-
-    const availableNotes = new Set(notes().map((note) => note.relPath));
-    surface?.recompile(
-      affected.filter((noteId) => noteId !== currentRelPath && availableNotes.has(noteId))
-    );
-    await updateLinkGraphFromDeltas(events, changed);
-  };
-
-  const scheduleSourceDelta = (event: VaultChange): void => {
-    const path =
-      event.kind === 'structural'
-        ? event.relPath
-        : event.kind === 'deleted'
-          ? event.relPath
-          : event.note.relPath;
-    pendingSourceChanges.set(path, event);
-    if (sourceDeltaTimer !== undefined) clearTimeout(sourceDeltaTimer);
-    sourceDeltaTimer = setTimeout(() => {
-      sourceDeltaTimer = undefined;
-      const events = [...pendingSourceChanges.values()];
-      pendingSourceChanges.clear();
-      sourceDeltaTail = sourceDeltaTail
-        .then(() => applySourceDeltaBatch(events))
-        .catch((error) => console.debug('Unable to apply Typst source delta', error));
-    }, 80);
   };
 
   const refreshOutline = (): void => {
@@ -720,7 +618,7 @@ export const App = () => {
   };
 
   const resolveNoteHrefAgainstVault = (rawHref: string, fromRelPath: string): string | null =>
-    resolveNoteHref(rawHref, fromRelPath, new Set(notes().map((n) => n.relPath)));
+    linkController.resolveHref(rawHref, fromRelPath);
 
   const scrollToAnchor = (id: string): void => {
     if (!surfaceMount) return;
@@ -763,57 +661,6 @@ export const App = () => {
       prefetchTimer = undefined;
       void runPrefetch(relPath);
     }, PREFETCH_DEBOUNCE_MS);
-  };
-
-  const rebuildLinkGraph = async (): Promise<void> => {
-    try {
-      const files = await readTypstSourceFiles();
-      const t0 = performance.now();
-      linkGraphIndex = createLinkGraphIndex(files, notes());
-      setLinkGraph(linkGraphIndex.snapshot());
-      const durationMs = performance.now() - t0;
-      window.dispatchEvent(
-        new CustomEvent<{ durationMs: number; noteCount: number; mode: 'full' }>(
-          'folea:graph-built',
-          {
-            detail: { durationMs, noteCount: notes().length, mode: 'full' }
-          }
-        )
-      );
-    } catch {
-      // Graph remains stale until next vault change
-    }
-  };
-
-  const updateLinkGraphFromDeltas = async (
-    events: readonly VaultChange[],
-    changed: ReadonlyMap<string, string>
-  ): Promise<void> => {
-    const canUpdateIncrementally =
-      linkGraphIndex !== undefined && events.every((event) => event.kind === 'changed');
-    if (!canUpdateIncrementally) {
-      await rebuildLinkGraph();
-      return;
-    }
-
-    const t0 = performance.now();
-    for (const [relPath, source] of changed) {
-      linkGraphIndex!.updateSource(relPath, source);
-    }
-    setLinkGraph(linkGraphIndex!.snapshot());
-    window.dispatchEvent(
-      new CustomEvent<{
-        durationMs: number;
-        noteCount: number;
-        mode: 'incremental';
-      }>('folea:graph-built', {
-        detail: {
-          durationMs: performance.now() - t0,
-          noteCount: notes().length,
-          mode: 'incremental'
-        }
-      })
-    );
   };
 
   const loadVaultStateOrDefault = async (): Promise<VaultStateFileV1> => {
@@ -860,26 +707,14 @@ export const App = () => {
   const refreshVault = async (vsParam?: VaultStateFileV1): Promise<void> => {
     const generation = ++navigationGeneration;
     try {
-      renderSourceFiles = undefined;
       const snapshot = await window.folea.vault.snapshot();
+      if (generation !== navigationGeneration) return;
       const listedNotes = vaultIndex.rebuild(snapshot.notes);
       setNotes(listedNotes);
       setDirectories([...snapshot.directories]);
       setVaultStatus(listedNotes.length === 0 ? 'empty vault' : 'vault open');
-      const sourceFiles = await readTypstSourceFiles();
-      const sourceVersion = ++renderSourceVersion;
-      await surface?.syncSnapshot(sourceVersion, sourceFiles);
-      window.dispatchEvent(
-        new CustomEvent('folea:source-synced', {
-          detail: {
-            kind: 'snapshot',
-            version: sourceVersion,
-            changedCount: sourceFiles.size,
-            deletedCount: 0,
-            totalFileCount: sourceFiles.size
-          }
-        })
-      );
+      const { files: sourceFiles, version: sourceVersion } = await sourceController.syncSnapshot();
+      if (generation !== navigationGeneration) return;
 
       const vs = vsParam ?? (await loadVaultStateOrDefault());
       setRecentNotes(vs.recentNotes);
@@ -927,7 +762,7 @@ export const App = () => {
         surface?.clear();
       }
 
-      void rebuildLinkGraph();
+      void linkController.rebuild();
 
       setTimeout(() => {
         void window.folea.vaultState.load().then((freshVs) => {
@@ -946,6 +781,24 @@ export const App = () => {
       setVaultStatus('no vault');
     }
   };
+
+  sourceController = createSourceSyncController({
+    getSurface: () => surface,
+    getNotes: notes,
+    getSelectedRelPath: selectedRelPath,
+    refreshStructural: () => refreshVault(),
+    selectFallbackAfterDelete: async () => {
+      const generation = ++navigationGeneration;
+      await renderSelectedNote(generation, notes());
+    },
+    setCurrentSource,
+    updateLinks: (events, changed) => linkController.updateFromDeltas(events, changed)
+  });
+  linkController = createLinkController({
+    getNotes: notes,
+    readSourceFiles: sourceController.readSourceFiles,
+    setGraph: setLinkGraph
+  });
 
   const parentDirectory = (relPath: string): string => getParentFolderPath(relPath) ?? '';
 
@@ -1010,269 +863,35 @@ export const App = () => {
       (result) => result === true
     );
 
-  const createNoteFlow = async (directory: string): Promise<void> => {
-    const rawName = await requestText('Create note', 'Note name', '', 'Continue', 'Note name');
-    if (rawName === undefined) return;
-    try {
-      const segment = parseVaultEntryName(rawName.trim(), 'Note name');
-      const filename = segment.endsWith('.typ') ? segment : `${segment}.typ`;
-      const templates = await window.folea.vault.templates();
-      const previous = lastCreationTemplate();
-      const selectedTemplatePath = await requestVaultDialog({
-        kind: 'template',
-        title: 'Choose template',
-        templates,
-        selectedRelPath: templates.some((template) => template.relPath === previous)
-          ? previous
-          : null,
-        submitLabel: 'Create'
-      });
-      if (selectedTemplatePath === undefined) return;
-      const template =
-        typeof selectedTemplatePath === 'string'
-          ? templates.find((candidate) => candidate.relPath === selectedTemplatePath)
-          : undefined;
-      const relPath = directory === '' ? filename : `${directory}/${filename}`;
-      const contents = template
-        ? rewriteTypstReferences(
-            template.contents,
-            template.relPath,
-            relPath,
-            new Map(),
-            new Set(['import', 'include'] as const)
-          ).source
-        : '';
-      await window.folea.vault.create({ relPath, contents });
-      const templatePath = template?.relPath ?? null;
-      const state = await window.folea.vaultState.update({
-        type: 'templateSelected',
-        relPath: templatePath
-      });
-      setLastCreationTemplate(state.lastCreationTemplate);
-      await refreshVault(state);
-      await selectNote(relPath);
-    } catch (error) {
-      reportOperationError(error);
-    }
-  };
-
-  const createDirectoryFlow = async (directoryOverride?: string): Promise<void> => {
-    const rawName = await requestText(
-      'Create directory',
-      'Directory name',
-      '',
-      'Create',
-      'Directory name'
-    );
-    if (rawName === undefined) return;
-    try {
-      const name = parseVaultEntryName(rawName.trim(), 'Directory name');
-      const directory = directoryOverride ?? creationDirectory();
-      const relPath = directory === '' ? name : `${directory}/${name}`;
-      await window.folea.vault.createDirectory({ relPath });
-      await refreshVault();
-    } catch (error) {
-      reportOperationError(error);
-    }
-  };
-
-  const renameSelectionFlow = async (): Promise<void> => {
-    const row = selectedTreeRow();
-    if (!row) return;
-    const rawName = await requestText('Rename entry', 'New name', row.name, 'Rename');
-    if (rawName === undefined) return;
-    try {
-      let name = parseVaultEntryName(rawName.trim(), 'New name');
-      if (row.kind === 'note' && !name.endsWith('.typ')) name += '.typ';
-      const parent = parentDirectory(row.relPath);
-      const to = parent === '' ? name : `${parent}/${name}`;
-      const impact = await window.folea.vault.analyzeOperation({
-        operation: 'rename',
-        sources: [row.relPath],
-        destination: to
-      });
-      const updateReferences =
-        impact.references.length === 0 ||
-        (await requestConfirmation(
-          'Update references',
-          `${impact.references.length} references are affected. Update them?`,
-          'Update'
-        ));
-      const result = await window.folea.vault.renameEntry({
-        from: row.relPath,
-        to,
-        updateReferences
-      });
-      setTreeMarks((marks) => {
-        const next = new Set(marks);
-        next.delete(row.relPath);
-        next.add(to);
-        return next;
-      });
-      await refreshVault();
-      if (row.kind === 'note' && selectedRelPath() === row.relPath) await selectNote(to);
-      reportOperationWarnings(result.warnings);
-    } catch (error) {
-      reportOperationError(error);
-    }
-  };
-
-  const moveMarksFlow = async (
-    explicitSources?: readonly string[],
-    targetRow = selectedTreeRow()
-  ): Promise<void> => {
-    const sources = explicitSources ?? [...treeMarks()];
-    if (sources.length === 0) return;
-    const destinationDirectory = targetRow
-      ? targetRow.kind === 'folder'
-        ? targetRow.relPath
-        : parentDirectory(targetRow.relPath)
-      : '';
-    try {
-      const impact = await window.folea.vault.analyzeOperation({
-        operation: 'move',
-        sources,
-        destination: destinationDirectory
-      });
-      const updateReferences =
-        impact.references.length === 0 ||
-        (await requestConfirmation(
-          'Update references',
-          `${impact.references.length} references are affected. Update them?`,
-          'Update'
-        ));
-      const result = await window.folea.vault.moveBatch({
-        sources,
-        destinationDirectory,
-        updateReferences
-      });
-      setTreeMarks(new Set<string>());
-      await refreshVault();
-      const currentMapping = result.mappings.find(
-        (mapping) =>
-          selectedRelPath() === mapping.from || selectedRelPath().startsWith(`${mapping.from}/`)
-      );
-      if (currentMapping) {
-        const mapped = `${currentMapping.to}${selectedRelPath().slice(currentMapping.from.length)}`;
-        if (mapped.endsWith('.typ')) await selectNote(mapped);
-      }
-      reportOperationWarnings(result.warnings);
-    } catch (error) {
-      reportOperationError(error);
-    }
-  };
-
-  const deleteSelectionFlow = async (explicitSources?: readonly string[]): Promise<void> => {
-    const row = selectedTreeRow();
-    const sources =
-      explicitSources ?? (treeMarks().size > 0 ? [...treeMarks()] : row ? [row.relPath] : []);
-    if (sources.length === 0) return;
-    try {
-      const impact = await window.folea.vault.analyzeOperation({ operation: 'trash', sources });
-      const summary = `${impact.counts.notes} notes, ${impact.counts.directories} directories, ${impact.counts.otherFiles} other files`;
-      if (
-        !(await requestConfirmation(
-          'Move to trash',
-          `Move ${summary} to the system trash?`,
-          'Move to trash',
-          true
-        ))
-      )
-        return;
-      const removeReferences =
-        impact.references.length > 0 &&
-        (await requestConfirmation(
-          'Remove references',
-          `Remove ${impact.references.length} external references too?`,
-          'Remove references',
-          true
-        ));
-      const result = await window.folea.vault.trashBatch({ sources, removeReferences });
-      const succeeded = new Set(
-        result.results.filter((item) => item.success).map((item) => item.source)
-      );
-      setTreeMarks((marks) => new Set([...marks].filter((mark) => !succeeded.has(mark))));
-      await refreshVault();
-      const failures = result.results.filter((item) => !item.success);
-      const messages = [
-        ...failures.map((item) => `${item.source}: ${item.error ?? 'unable to trash'}`),
-        ...result.warnings
-      ];
-      reportOperationWarnings(messages);
-    } catch (error) {
-      reportOperationError(error);
-    }
-  };
-
-  const manageTemplatesFlow = async (): Promise<void> => {
-    try {
-      setManagedTemplates(await window.folea.vault.templates());
-      setSelectedTemplateIndex(0);
-      openTemplateManagerContext();
-    } catch (error) {
-      reportOperationError(error);
-    }
-  };
-
-  const openManagedTemplate = async (index = selectedTemplateIndex()): Promise<void> => {
-    const template = managedTemplates()[index];
-    if (template) await window.folea.editor.open(template.relPath).catch(reportOperationError);
-  };
-
-  const renameManagedTemplate = async (index = selectedTemplateIndex()): Promise<void> => {
-    const template = managedTemplates()[index];
-    if (!template) return;
-    const rawName = await requestText(
-      'Rename template',
-      'New template name',
-      template.name,
-      'Rename'
-    );
-    if (rawName === undefined) return;
-    try {
-      const name = parseVaultEntryName(rawName.trim(), 'Template name');
-      const to = `_templates/${name.endsWith('.typ') ? name : `${name}.typ`}`;
-      await window.folea.vault.renameEntry({
-        from: template.relPath,
-        to,
-        updateReferences: false,
-        templateMode: true
-      });
-      setManagedTemplates(await window.folea.vault.templates());
-      setLastCreationTemplate((current) => (current === template.relPath ? to : current));
-    } catch (error) {
-      reportOperationError(error);
-    }
-  };
-
-  const deleteManagedTemplate = async (index = selectedTemplateIndex()): Promise<void> => {
-    const template = managedTemplates()[index];
-    if (!template) return;
-    if (
-      !(await requestConfirmation(
-        'Move template to trash',
-        `Move template ${template.name} to the system trash?`,
-        'Move to trash',
-        true
-      ))
-    )
-      return;
-    try {
-      const result = await window.folea.vault.trashBatch({
-        sources: [template.relPath],
-        templateMode: true
-      });
-      const failed = result.results.find((item) => !item.success);
-      if (failed) throw new Error(failed.error ?? 'Unable to trash template');
-      setManagedTemplates(await window.folea.vault.templates());
-      setSelectedTemplateIndex((current) =>
-        Math.min(current, Math.max(0, managedTemplates().length - 1))
-      );
-      if (lastCreationTemplate() === template.relPath) setLastCreationTemplate(null);
-    } catch (error) {
-      reportOperationError(error);
-    }
-  };
+  const vaultOperations = createVaultOperations({
+    selectedRow: selectedTreeRow,
+    marks: treeMarks,
+    setMarks: setTreeMarks,
+    selectedRelPath,
+    managedTemplates,
+    setManagedTemplates,
+    selectedTemplateIndex,
+    setSelectedTemplateIndex,
+    lastCreationTemplate,
+    setLastCreationTemplate,
+    requestDialog: requestVaultDialog,
+    requestText,
+    requestConfirmation,
+    refreshVault,
+    selectNote,
+    openTemplateManager: openTemplateManagerContext,
+    reportError: reportOperationError,
+    reportWarnings: reportOperationWarnings
+  });
+  const createNoteFlow = vaultOperations.createNote;
+  const createDirectoryFlow = vaultOperations.createDirectory;
+  const renameSelectionFlow = vaultOperations.renameSelection;
+  const moveMarksFlow = vaultOperations.moveMarks;
+  const deleteSelectionFlow = vaultOperations.deleteSelection;
+  const manageTemplatesFlow = vaultOperations.manageTemplates;
+  const openManagedTemplate = vaultOperations.openTemplate;
+  const renameManagedTemplate = vaultOperations.renameTemplate;
+  const deleteManagedTemplate = vaultOperations.deleteTemplate;
 
   const closeVault = async (): Promise<void> => {
     warmupQueue.cancel();
@@ -1295,10 +914,10 @@ export const App = () => {
     setCurrentSource('');
     setOutlineEntries([]);
     setLinkGraph(null);
-    linkGraphIndex = undefined;
+    linkController.clear();
     setLinksBacklinks([]);
     setLinksOutgoing([]);
-    renderSourceFiles = undefined;
+    sourceController.clear();
     surface?.clear();
     setVaultStatus('no vault');
     setWarmupMessage(undefined);
@@ -2075,14 +1694,14 @@ export const App = () => {
 
     const unsubscribeVault = window.folea.vault.onChanged((event) => {
       if (event.kind === 'structural') {
-        scheduleSourceDelta(event);
+        sourceController.schedule(event);
         return;
       }
 
       const nextNotes = vaultIndex.applyChange(event);
       setNotes(nextNotes);
       setVaultStatus(nextNotes.length === 0 ? 'empty vault' : 'vault open');
-      scheduleSourceDelta(event);
+      sourceController.schedule(event);
     });
 
     const unsubscribeSearchResult = window.folea.search.onResult((event) => {
@@ -2111,7 +1730,7 @@ export const App = () => {
     });
 
     const refreshListener = (): void => {
-      renderSourceFiles = undefined;
+      sourceController.clear();
       void refreshVault();
     };
     const pageStatusListener = (event: Event): void => {
@@ -2171,8 +1790,7 @@ export const App = () => {
       clearPrefetchTimer();
       clearSearchTimer();
       clearQuickOpenSearchTimer();
-      if (sourceDeltaTimer !== undefined) clearTimeout(sourceDeltaTimer);
-      pendingSourceChanges.clear();
+      sourceController.dispose();
       warmupQueue.dispose();
       positionDebounce.dispose();
       window.folea.search.cancel();

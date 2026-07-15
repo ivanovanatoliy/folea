@@ -1,0 +1,50 @@
+.statusline {
+  height: 24px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 10px;
+  background: var(--folea-surface-muted);
+  color: var(--folea-text);
+  margin: 0;
+  font: 14px var(--folea-font-mono);
+  line-height: 1;
+}
+
+.statusline-doc {
+  transform: translateY(2px);
+  display: inline-block;
+  color: var(--folea-text);
+}
+
+.statusline-mode {
+  transform: translateY(2px);
+  display: inline-block;
+  color: var(--folea-text);
+}
+
+.statusline-page {
+  transform: translateY(2px);
+  display: inline-block;
+  margin-left: auto;
+  color: var(--folea-text);
+}
+
+.statusline-vault {
+  transform: translateY(2px);
+  color: var(--folea-text);
+}
+
+.statusline-zoom {
+  transform: translateY(2px);
+  color: var(--folea-text);
+}
+
+.statusline-warning {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--folea-danger);
+}

@@ -24,50 +24,33 @@ import {
   type VaultSnapshot,
   type VaultTemplate
 } from '../../shared/ipc/vault';
-import {
-  cleanupTypstReferences,
-  parseTypstReferences,
-  resolveTypstReferencePath,
-  rewriteTypstReferences
-} from '../../shared/typst-links';
-import { OBSIDIAN_TYPST_PACKAGE_CACHE_RELATIVE_PATH } from '../../shared/obsidian-typst';
 import { noteMetaFromAbsolutePath } from './metadata';
 import {
-  IGNORED_VAULT_DIRECTORIES,
-  RENDER_IGNORED_VAULT_DIRECTORIES,
-  isInsideOrEqual,
-  isNodeError,
   openVaultRoot,
   pathExists,
   resolveExistingNotePath,
   resolveExistingEntryPath,
   resolveNewEntryPath,
   resolveNewNotePath,
-  toPosixPath,
   type OpenVaultRoot
 } from './paths';
 import { VaultWatcher } from './watcher';
+import { mapWithConcurrency, VAULT_IO_CONCURRENCY } from './concurrency';
+import { VaultIndexReader, type VaultReaderOptions } from './index-reader';
+import { VaultReferenceService } from './reference-service';
+export { VAULT_RENDER_FILES_MAX_COUNT, VAULT_RENDER_FILES_MAX_TOTAL_BYTES } from './index-reader';
 
 type VaultChangeListener = (event: VaultChange) => void;
 
-// Render dependency snapshots are IPC payloads: generous for normal vaults, bounded for safety.
-export const VAULT_RENDER_FILES_MAX_COUNT = 10_000;
-export const VAULT_RENDER_FILES_MAX_TOTAL_BYTES = 50 * 1024 * 1024;
-
-export interface VaultServiceOptions {
-  readonly renderFilesMaxCount?: number;
-  readonly renderFilesMaxTotalBytes?: number;
+export interface VaultServiceOptions extends VaultReaderOptions {
   readonly trashItem?: (absolutePath: string) => Promise<void>;
   readonly renamePath?: (from: string, to: string) => Promise<void>;
 }
 
-interface RenderFilesBudget {
-  fileCount: number;
-  totalBytes: number;
-}
-
 export class VaultService {
   private root: OpenVaultRoot | undefined;
+  private reader: VaultIndexReader | undefined;
+  private references: VaultReferenceService | undefined;
   private watcher: VaultWatcher | undefined;
   private readonly listeners = new Set<VaultChangeListener>();
 
@@ -82,6 +65,8 @@ export class VaultService {
     const nextRoot = await openVaultRoot(rootPath);
     await this.closeWatcher();
     this.root = nextRoot;
+    this.reader = new VaultIndexReader(nextRoot, this.options);
+    this.references = new VaultReferenceService(nextRoot, this.reader);
 
     const watcher = new VaultWatcher(nextRoot, (event) => this.emit(event));
     await watcher.start();
@@ -93,6 +78,8 @@ export class VaultService {
   async close(): Promise<void> {
     await this.closeWatcher();
     this.root = undefined;
+    this.reader = undefined;
+    this.references = undefined;
   }
 
   async dispose(): Promise<void> {
@@ -101,46 +88,15 @@ export class VaultService {
   }
 
   async list(): Promise<NoteMeta[]> {
-    const root = this.requireRoot();
-    const notes = await this.listFromDirectory(root, root.realRoot, new Set([root.realRoot]));
-    return notes.sort((left, right) => left.relPath.localeCompare(right.relPath));
+    return this.requireReader().list();
   }
 
   async snapshot(): Promise<VaultSnapshot> {
-    const root = this.requireRoot();
-    const directories: VaultDirectory[] = [];
-    const notes = await this.listFromDirectory(
-      root,
-      root.realRoot,
-      new Set([root.realRoot]),
-      directories
-    );
-    return {
-      notes: notes.sort((left, right) => left.relPath.localeCompare(right.relPath)),
-      directories: directories.sort((left, right) => left.relPath.localeCompare(right.relPath))
-    };
+    return this.requireReader().snapshot();
   }
 
   async templates(): Promise<VaultTemplate[]> {
-    const root = this.requireRoot();
-    const templatesRoot = path.join(root.realRoot, '_templates');
-    let entries: import('node:fs').Dirent[];
-    try {
-      entries = await fs.readdir(templatesRoot, { withFileTypes: true });
-    } catch (error) {
-      if (isNodeError(error) && error.code === 'ENOENT') return [];
-      throw error;
-    }
-    const templates = await Promise.all(
-      entries
-        .filter((entry) => entry.isFile() && entry.name.endsWith('.typ'))
-        .map(async (entry) => ({
-          relPath: `_templates/${entry.name}`,
-          name: entry.name.slice(0, -'.typ'.length),
-          contents: await fs.readFile(path.join(templatesRoot, entry.name), 'utf8')
-        }))
-    );
-    return templates.sort((left, right) => left.name.localeCompare(right.name));
+    return this.requireReader().templates();
   }
 
   async createDirectory(request: CreateDirectoryRequest): Promise<VaultDirectory> {
@@ -168,7 +124,7 @@ export class VaultService {
       counts.otherFiles += result.counts.otherFiles;
       result.notes.forEach((note) => selectedNotes.add(note));
     }
-    const allReferences = await this.findReferencesTo(selectedNotes);
+    const allReferences = await this.requireReferences().findReferencesTo(selectedNotes);
     const references =
       request.operation === 'trash'
         ? allReferences.filter((reference) => !selectedNotes.has(reference.from))
@@ -230,7 +186,7 @@ export class VaultService {
     let referencesUpdated = 0;
     let warnings: readonly string[] = [];
     if (request.removeReferences === true && deletedNotes.size > 0) {
-      const cleanup = await this.cleanupReferences(deletedNotes);
+      const cleanup = await this.requireReferences().cleanupReferences(deletedNotes);
       referencesUpdated = cleanup.updated;
       warnings = cleanup.warnings;
     }
@@ -238,39 +194,11 @@ export class VaultService {
   }
 
   async renderFiles(): Promise<VaultRenderFile[]> {
-    const root = this.requireRoot();
-    const budget: RenderFilesBudget = { fileCount: 0, totalBytes: 0 };
-    const files = await this.listRenderFilesFromDirectory(
-      root,
-      root.realRoot,
-      new Set([root.realRoot]),
-      budget
-    );
-    const packageCacheRoot = path.join(
-      root.realRoot,
-      ...OBSIDIAN_TYPST_PACKAGE_CACHE_RELATIVE_PATH.split('/')
-    );
-
-    if (await pathExists(packageCacheRoot)) {
-      files.push(
-        ...(await this.listRenderFilesFromDirectory(
-          root,
-          packageCacheRoot,
-          new Set([await fs.realpath(packageCacheRoot)]),
-          budget,
-          { includeIgnoredDirectories: true, packageCacheOnly: true }
-        ))
-      );
-    }
-
-    const unique = new Map(files.map((file) => [file.relPath, file]));
-    return [...unique.values()].sort((left, right) => left.relPath.localeCompare(right.relPath));
+    return this.requireReader().renderFiles();
   }
 
   async read(request: ReadNoteRequest): Promise<string> {
-    const root = this.requireRoot();
-    const resolved = await resolveExistingNotePath(root, request.relPath);
-    return fs.readFile(resolved.absolutePath, 'utf8');
+    return this.requireReader().read(request.relPath);
   }
 
   async create(request: CreateNoteRequest): Promise<NoteMeta> {
@@ -324,6 +252,16 @@ export class VaultService {
     return this.root;
   }
 
+  private requireReader(): VaultIndexReader {
+    this.requireRoot();
+    return this.reader!;
+  }
+
+  private requireReferences(): VaultReferenceService {
+    this.requireRoot();
+    return this.references!;
+  }
+
   getOpenRoot(): OpenVaultRoot | undefined {
     return this.root;
   }
@@ -334,186 +272,6 @@ export class VaultService {
       this.watcher = undefined;
       await watcher.close();
     }
-  }
-
-  private async listFromDirectory(
-    root: OpenVaultRoot,
-    absoluteDirectory: string,
-    visitedRealDirectories: Set<string>,
-    directories?: VaultDirectory[]
-  ): Promise<NoteMeta[]> {
-    const entries = await fs.readdir(absoluteDirectory, { withFileTypes: true });
-    const notes: NoteMeta[] = [];
-
-    for (const entry of entries) {
-      if (entry.isDirectory() && IGNORED_VAULT_DIRECTORIES.has(entry.name)) {
-        continue;
-      }
-
-      const absolutePath = path.join(absoluteDirectory, entry.name);
-      if (entry.isDirectory()) {
-        const realDirectory = await fs.realpath(absolutePath);
-        if (
-          !isInsideOrEqual(root.realRoot, realDirectory) ||
-          visitedRealDirectories.has(realDirectory)
-        ) {
-          continue;
-        }
-
-        visitedRealDirectories.add(realDirectory);
-        const relPath = toPosixPath(path.relative(root.realRoot, absolutePath));
-        directories?.push({ relPath, name: entry.name });
-        notes.push(
-          ...(await this.listFromDirectory(root, absolutePath, visitedRealDirectories, directories))
-        );
-        continue;
-      }
-
-      if (entry.isSymbolicLink()) {
-        notes.push(...(await this.listSymlink(root, absolutePath, visitedRealDirectories)));
-        continue;
-      }
-
-      if (entry.isFile() && entry.name.endsWith('.typ')) {
-        notes.push(await noteMetaFromAbsolutePath(root, absolutePath));
-      }
-    }
-
-    return notes;
-  }
-
-  private async listRenderFilesFromDirectory(
-    root: OpenVaultRoot,
-    absoluteDirectory: string,
-    visitedRealDirectories: Set<string>,
-    budget: RenderFilesBudget,
-    options: {
-      readonly includeIgnoredDirectories?: boolean;
-      readonly packageCacheOnly?: boolean;
-    } = {}
-  ): Promise<VaultRenderFile[]> {
-    const entries = await fs.readdir(absoluteDirectory, { withFileTypes: true });
-    const files: VaultRenderFile[] = [];
-
-    for (const entry of entries) {
-      if (
-        !options.includeIgnoredDirectories &&
-        entry.isDirectory() &&
-        RENDER_IGNORED_VAULT_DIRECTORIES.has(entry.name)
-      ) {
-        continue;
-      }
-
-      const absolutePath = path.join(absoluteDirectory, entry.name);
-      if (entry.isDirectory()) {
-        const realDirectory = await fs.realpath(absolutePath);
-        if (
-          !isInsideOrEqual(root.realRoot, realDirectory) ||
-          visitedRealDirectories.has(realDirectory)
-        ) {
-          continue;
-        }
-
-        visitedRealDirectories.add(realDirectory);
-        files.push(
-          ...(await this.listRenderFilesFromDirectory(
-            root,
-            absolutePath,
-            visitedRealDirectories,
-            budget,
-            options
-          ))
-        );
-        continue;
-      }
-
-      if (!entry.isFile() || !this.isRenderTextFile(entry.name, options.packageCacheOnly)) {
-        continue;
-      }
-
-      const relPath = toPosixPath(path.relative(root.realRoot, absolutePath));
-      const stats = await fs.stat(absolutePath);
-      this.reserveRenderFileBudget(relPath, stats.size, budget);
-      files.push({
-        relPath,
-        contents: await fs.readFile(absolutePath, 'utf8')
-      });
-    }
-
-    return files;
-  }
-
-  private isRenderTextFile(filename: string, packageCacheOnly?: boolean): boolean {
-    if (filename.endsWith('.typ')) {
-      return true;
-    }
-
-    return packageCacheOnly === true && filename === 'typst.toml';
-  }
-
-  private reserveRenderFileBudget(
-    relPath: string,
-    byteSize: number,
-    budget: RenderFilesBudget
-  ): void {
-    const maxCount = this.options.renderFilesMaxCount ?? VAULT_RENDER_FILES_MAX_COUNT;
-    const maxTotalBytes =
-      this.options.renderFilesMaxTotalBytes ?? VAULT_RENDER_FILES_MAX_TOTAL_BYTES;
-    const nextFileCount = budget.fileCount + 1;
-    const nextTotalBytes = budget.totalBytes + byteSize;
-
-    if (nextFileCount > maxCount) {
-      throw new Error(
-        `Vault render snapshot exceeds ${maxCount} text files while adding ${relPath}`
-      );
-    }
-
-    if (nextTotalBytes > maxTotalBytes) {
-      throw new Error(
-        `Vault render snapshot exceeds ${maxTotalBytes} bytes while adding ${relPath}`
-      );
-    }
-
-    budget.fileCount = nextFileCount;
-    budget.totalBytes = nextTotalBytes;
-  }
-
-  private async listSymlink(
-    root: OpenVaultRoot,
-    absolutePath: string,
-    visitedRealDirectories: Set<string>
-  ): Promise<NoteMeta[]> {
-    let realPath: string;
-    try {
-      realPath = await fs.realpath(absolutePath);
-    } catch (error) {
-      if (isNodeError(error) && error.code === 'ENOENT') {
-        return [];
-      }
-
-      throw error;
-    }
-
-    if (!isInsideOrEqual(root.realRoot, realPath)) {
-      return [];
-    }
-
-    const stats = await fs.stat(realPath);
-    if (stats.isDirectory()) {
-      if (visitedRealDirectories.has(realPath)) {
-        return [];
-      }
-
-      visitedRealDirectories.add(realPath);
-      return this.listFromDirectory(root, absolutePath, visitedRealDirectories);
-    }
-
-    if (stats.isFile() && absolutePath.endsWith('.typ')) {
-      const relPath = toPosixPath(path.relative(root.realRoot, absolutePath));
-      return [await noteMetaFromAbsolutePath(root, absolutePath, relPath)];
-    }
-
-    return [];
   }
 
   private async preflightSources(
@@ -618,14 +376,12 @@ export class VaultService {
     moves: readonly EntryMove[],
     updateReferences: boolean
   ): Promise<MoveVaultEntriesResult> {
-    const root = this.requireRoot();
+    this.requireRoot();
     const snapshot = await this.snapshot();
     const sources = new Map<string, string>();
     if (updateReferences) {
-      await Promise.all(
-        snapshot.notes.map(async (note) =>
-          sources.set(note.relPath, await this.read({ relPath: note.relPath }))
-        )
+      await mapWithConcurrency(snapshot.notes, VAULT_IO_CONCURRENCY, async (note) =>
+        sources.set(note.relPath, await this.read({ relPath: note.relPath }))
       );
     }
     const completed: EntryMove[] = [];
@@ -644,32 +400,13 @@ export class VaultService {
     }
 
     const mappings = new Map(moves.map((move) => [move.from, move.to]));
-    let referencesUpdated = 0;
-    const warnings: string[] = [];
-    if (updateReferences) {
-      for (const note of snapshot.notes) {
-        const contents = sources.get(note.relPath);
-        if (contents === undefined) continue;
-        const nextPath = mapManagedPath(note.relPath, mappings);
-        const result = rewriteTypstReferences(contents, note.relPath, nextPath, mappings);
-        referencesUpdated += result.updated;
-        warnings.push(...result.warnings);
-        if (result.source !== contents) {
-          const absolutePath = path.join(root.realRoot, ...nextPath.split('/'));
-          try {
-            await fs.writeFile(absolutePath, result.source, 'utf8');
-          } catch (error) {
-            warnings.push(
-              `${nextPath}: unable to update references: ${error instanceof Error ? error.message : String(error)}`
-            );
-          }
-        }
-      }
-    }
+    const references = updateReferences
+      ? await this.requireReferences().rewriteMovedReferences(snapshot, sources, mappings)
+      : { updated: 0, warnings: [] };
     return {
       mappings: moves.map(({ from, to }) => ({ from, to })),
-      referencesUpdated,
-      warnings
+      referencesUpdated: references.updated,
+      warnings: references.warnings
     };
   }
 
@@ -696,59 +433,18 @@ export class VaultService {
     }
     const counts = { notes: 0, directories: 1, otherFiles: 0 };
     const notes: string[] = [];
-    for (const entry of await fs.readdir(absolutePath, { withFileTypes: true })) {
+    const entries = await fs.readdir(absolutePath, { withFileTypes: true });
+    const children = await mapWithConcurrency(entries, VAULT_IO_CONCURRENCY, async (entry) => {
       const childRelPath = `${relPath}/${entry.name}`;
-      const child = await this.countEntry(path.join(absolutePath, entry.name), childRelPath);
+      return this.countEntry(path.join(absolutePath, entry.name), childRelPath);
+    });
+    for (const child of children) {
       counts.notes += child.counts.notes;
       counts.directories += child.counts.directories;
       counts.otherFiles += child.counts.otherFiles;
       notes.push(...child.notes);
     }
     return { counts, notes };
-  }
-
-  private async findReferencesTo(
-    selectedNotes: ReadonlySet<string>
-  ): Promise<import('../../shared/ipc/vault').VaultReferenceImpact[]> {
-    const snapshot = await this.snapshot();
-    const references: import('../../shared/ipc/vault').VaultReferenceImpact[] = [];
-    for (const note of snapshot.notes) {
-      const contents = await this.read({ relPath: note.relPath });
-      for (const ref of parseTypstReferences(contents)) {
-        const resolved = resolveTypstReferencePath(ref.rawTarget, note.relPath);
-        if (!resolved) continue;
-        const target = selectedNotes.has(resolved)
-          ? resolved
-          : selectedNotes.has(`${resolved}.typ`)
-            ? `${resolved}.typ`
-            : undefined;
-        if (target) references.push({ from: note.relPath, to: target, kind: ref.kind });
-      }
-    }
-    return references;
-  }
-
-  private async cleanupReferences(
-    deletedNotes: ReadonlySet<string>
-  ): Promise<{ readonly updated: number; readonly warnings: readonly string[] }> {
-    const snapshot = await this.snapshot();
-    let updated = 0;
-    const warnings: string[] = [];
-    for (const note of snapshot.notes) {
-      const source = await this.read({ relPath: note.relPath });
-      const result = cleanupTypstReferences(source, note.relPath, deletedNotes);
-      updated += result.updated;
-      warnings.push(...result.warnings);
-      if (source !== result.source) {
-        const root = this.requireRoot();
-        await fs.writeFile(
-          path.join(root.realRoot, ...note.relPath.split('/')),
-          result.source,
-          'utf8'
-        );
-      }
-    }
-    return { updated, warnings };
   }
 
   private emit(event: VaultChange): void {
@@ -771,15 +467,6 @@ interface EntryMove {
   readonly fromAbsolute: string;
   readonly toAbsolute: string;
 }
-
-const mapManagedPath = (relPath: string, mappings: ReadonlyMap<string, string>): string => {
-  const direct = mappings.get(relPath);
-  if (direct) return direct;
-  for (const [from, to] of [...mappings].sort(([left], [right]) => right.length - left.length)) {
-    if (relPath.startsWith(`${from}/`)) return `${to}${relPath.slice(from.length)}`;
-  }
-  return relPath;
-};
 
 const testTrashDeletesPermanently =
   process.env.FOLEA_ALLOW_TEST_VAULT_OPEN === '1' && process.env.FOLEA_TEST_TRASH_DELETE === '1';

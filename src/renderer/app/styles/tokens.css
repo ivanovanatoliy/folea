@@ -1,0 +1,81 @@
+:root {
+  color-scheme: light;
+  --folea-accent: #3d9c6b;
+  --folea-accent-strong: #2e7c52;
+  --folea-accent-bright: #5fc28d;
+  --folea-bg: #f7f8fa;
+  --folea-surface: #ffffff;
+  --folea-surface-themed: #ffffff;
+  --folea-surface-muted: #eef2f6;
+  --folea-elevated: rgb(248 250 252 / 96%);
+  --folea-text: #1f2328;
+  --folea-text-strong: #1f2328;
+  --folea-muted: #6e7781;
+  --folea-muted-strong: #57606a;
+  --folea-border: #d7dde5;
+  --folea-border-strong: #c9d2dc;
+  --folea-highlight: #cfe0dc;
+  --folea-highlight-text: #172f2b;
+  --folea-row-border: #eef2f6;
+  --folea-overlay-shadow: rgb(31 35 40 / 18%);
+  --folea-caret: rgb(61 156 107 / 50%);
+  --folea-caret-border: rgb(46 124 82 / 80%);
+  --folea-selection: rgb(95 194 141 / 28%);
+  --folea-search-highlight: rgb(95 194 141 / 28%);
+  --folea-error-bg: #fff7f7;
+  --folea-error-border: #e5b7b7;
+  --folea-error-text: #5f2424;
+  --folea-link: #2e7c52;
+  --folea-danger: #cf222e;
+  --folea-font-sans:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --folea-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  background: var(--folea-bg);
+  color: var(--folea-text);
+  font-family: var(--folea-font-sans);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --folea-bg: #000000;
+  --folea-surface: #ffffff;
+  --folea-surface-themed: #0f0f0f;
+  --folea-surface-muted: #000000;
+  --folea-elevated: #000;
+  --folea-text: #d7dce2;
+  --folea-text-strong: #f3f5f7;
+  --folea-muted: #89919c;
+  --folea-muted-strong: #b1b3b1;
+  --folea-border: #292929;
+  --folea-border-strong: #48505b;
+  --folea-highlight: #24433b;
+  --folea-highlight-text: #eef7f4;
+  --folea-row-border: rgb(52 57 67 / 82%);
+  --folea-overlay-shadow: rgb(0 0 0 / 30%);
+  --folea-caret: rgb(95 194 141 / 46%);
+  --folea-caret-border: rgb(95 194 141 / 82%);
+  --folea-selection: rgb(95 194 141 / 24%);
+  --folea-search-highlight: rgb(95 194 141 / 24%);
+  --folea-error-bg: #321f22;
+  --folea-error-border: #704349;
+  --folea-error-text: #f0c9ce;
+  --folea-link: #5fc28d;
+  --folea-danger: #ef7f87;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+}
+
+:focus-visible {
+  outline: 2px solid var(--folea-accent-bright) !important;
+  outline-offset: 2px;
+}

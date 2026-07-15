@@ -1,0 +1,139 @@
+.tree-overlay-header {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--folea-border);
+  color: var(--folea-muted-strong);
+  font:
+    12px/1 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    'Liberation Mono',
+    monospace;
+}
+
+.tree-scroll {
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.tree-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.tree-spacer {
+  position: relative;
+  min-height: 100%;
+}
+
+.tree-window {
+  position: absolute;
+  inset: 0 0 auto;
+}
+
+.tree-row {
+  box-sizing: border-box;
+  height: 28px;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  padding-right: 12px;
+  font:
+    12px/1 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    'Liberation Mono',
+    monospace;
+  color: var(--folea-muted-strong);
+}
+
+.tree-row[data-selected='true'] {
+  background: var(--folea-highlight);
+  color: var(--folea-highlight-text);
+}
+
+.tree-row[data-marked='true'] .tree-row-marker::before {
+  content: '•';
+  color: var(--folea-accent-bright);
+  margin-right: 5px;
+}
+
+.tree-row[data-drag-target='true'],
+.tree-overlay-header[data-drag-target='true'] {
+  outline: 1px solid currentColor;
+}
+
+.tree-context-menu {
+  position: fixed;
+  z-index: 100;
+  min-width: 150px;
+  padding: 4px;
+  background: var(--folea-elevated);
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 30%);
+}
+
+.tree-context-menu button {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+}
+
+.tree-context-menu button:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.tree-row-marker {
+  color: var(--folea-muted);
+  text-align: center;
+}
+
+.tree-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-selection-anchor {
+  display: none;
+}
+
+.tree-search-line {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border-top: 1px solid var(--folea-border);
+  background: var(--folea-row-border);
+  color: var(--folea-text);
+  font:
+    12px/1 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    'Liberation Mono',
+    monospace;
+}
+
+.tree-search-prompt {
+  color: var(--folea-muted);
+}
+
+.tree-search-query {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
