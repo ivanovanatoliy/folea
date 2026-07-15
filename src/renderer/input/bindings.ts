@@ -343,6 +343,86 @@ registerCommand({
   title: 'Tree last row',
   run: (ctx) => ctx.tree.selectLast()
 });
+registerCommand({
+  id: 'tree.createNote',
+  title: 'Create note',
+  run: (ctx) => ctx.tree.createNote?.()
+});
+registerCommand({
+  id: 'tree.createNoteAtCurrent',
+  title: 'Create note beside current note',
+  run: (ctx) => ctx.tree.createNoteAtCurrent?.()
+});
+registerCommand({
+  id: 'tree.createDirectory',
+  title: 'Create directory',
+  run: (ctx) => ctx.tree.createDirectory?.()
+});
+registerCommand({
+  id: 'tree.rename',
+  title: 'Rename note or directory',
+  run: (ctx) => ctx.tree.renameSelection?.()
+});
+registerCommand({
+  id: 'tree.toggleMark',
+  title: 'Toggle tree mark',
+  run: (ctx) => ctx.tree.toggleMark?.()
+});
+registerCommand({
+  id: 'tree.clearMarks',
+  title: 'Clear tree marks',
+  run: (ctx) => ctx.tree.clearMarks?.()
+});
+registerCommand({
+  id: 'tree.moveMarks',
+  title: 'Move marked entries',
+  run: (ctx) => ctx.tree.moveMarks?.()
+});
+registerCommand({
+  id: 'tree.delete',
+  title: 'Move entries to trash',
+  run: (ctx) => ctx.tree.deleteSelection?.()
+});
+registerCommand({
+  id: 'templates.manage',
+  title: 'Manage note templates',
+  run: (ctx) => ctx.tree.manageTemplates?.()
+});
+registerCommand({
+  id: 'templates.close',
+  title: 'Close template manager',
+  run: (ctx) => ctx.tree.closeTemplates?.()
+});
+registerCommand({
+  id: 'templates.moveNext',
+  title: 'Select next template',
+  run: (ctx) => ctx.tree.nextTemplate?.()
+});
+registerCommand({
+  id: 'templates.movePrevious',
+  title: 'Select previous template',
+  run: (ctx) => ctx.tree.previousTemplate?.()
+});
+registerCommand({
+  id: 'templates.open',
+  title: 'Open selected template in editor',
+  run: (ctx) => ctx.tree.openTemplate?.()
+});
+registerCommand({
+  id: 'templates.rename',
+  title: 'Rename selected template',
+  run: (ctx) => ctx.tree.renameTemplate?.()
+});
+registerCommand({
+  id: 'templates.delete',
+  title: 'Move selected template to trash',
+  run: (ctx) => ctx.tree.deleteTemplate?.()
+});
+registerCommand({ id: 'vaultDialog.cancel', run: (ctx) => ctx.vaultDialog?.cancel() });
+registerCommand({ id: 'vaultDialog.submit', run: (ctx) => ctx.vaultDialog?.submit() });
+registerCommand({ id: 'vaultDialog.next', run: (ctx) => ctx.vaultDialog?.next() });
+registerCommand({ id: 'vaultDialog.previous', run: (ctx) => ctx.vaultDialog?.previous() });
+registerCommand({ id: 'vaultDialog.ignore', run: (ctx) => ctx.vaultDialog?.ignore() });
 
 registerCommand({
   id: 'editor.open',
@@ -463,6 +543,13 @@ export const TREE_KEYMAP: Keymap = new Map([
   ['G', 'tree.selectLast'],
   ['/', 'tree.openSearch'],
   ['Enter', 'tree.openSelection'],
+  ['%', 'tree.createNote'],
+  ['d', 'tree.createDirectory'],
+  ['R', 'tree.rename'],
+  ['mf', 'tree.toggleMark'],
+  ['mu', 'tree.clearMarks'],
+  ['mm', 'tree.moveMarks'],
+  ['D', 'tree.delete'],
   ['Escape', 'tree.close']
 ]);
 
@@ -477,6 +564,29 @@ export const TREE_SEARCH_KEYMAP: Keymap = new Map([
   ['Escape', 'tree.closeSearch'],
   ['Backspace', 'tree.searchBackspace'],
   ['*', 'tree.searchAppend']
+]);
+
+export const TEMPLATES_KEYMAP: Keymap = new Map([
+  ['j', 'templates.moveNext'],
+  ['k', 'templates.movePrevious'],
+  ['ArrowDown', 'templates.moveNext'],
+  ['ArrowUp', 'templates.movePrevious'],
+  ['Enter', 'templates.open'],
+  ['R', 'templates.rename'],
+  ['D', 'templates.delete'],
+  ['Escape', 'templates.close']
+]);
+
+export const VAULT_DIALOG_KEYMAP: Keymap = new Map([
+  ['Escape', 'vaultDialog.cancel'],
+  ['Enter', 'vaultDialog.submit'],
+  ['ArrowDown', 'vaultDialog.next'],
+  ['<C-n>', 'vaultDialog.next'],
+  ['ArrowUp', 'vaultDialog.previous'],
+  ['<C-p>', 'vaultDialog.previous'],
+  ['<C-b>', 'vaultDialog.cancel'],
+  [':', 'vaultDialog.ignore'],
+  ['/', 'vaultDialog.ignore']
 ]);
 
 export const PALETTE_KEYMAP: Keymap = new Map([
@@ -579,5 +689,6 @@ export const GLOBAL_KEYMAP: Keymap = new Map([
   ['<C-b>', 'view.toggleTree'],
   [':', 'palette.open'],
   ['/', 'search.open'],
-  ['<C-p>', 'document.quickOpen']
+  ['<C-p>', 'document.quickOpen'],
+  ['<C-n>', 'tree.createNoteAtCurrent']
 ]);

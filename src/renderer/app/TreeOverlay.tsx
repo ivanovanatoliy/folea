@@ -9,12 +9,43 @@ interface TreeOverlayProps {
   readonly searchQuery?: string;
   readonly searchActive?: boolean;
   readonly onRowClick?: (index: number) => void;
+  readonly marks?: ReadonlySet<string>;
+  readonly onCloseRequest?: () => void;
+  readonly onContextMenuVisibilityChange?: (visible: boolean) => void;
+  readonly registerContextMenuDismiss?: (dismiss: () => void) => void;
+  readonly onAction?: (
+    action:
+      | 'create-note'
+      | 'create-directory'
+      | 'open'
+      | 'editor'
+      | 'mark'
+      | 'move'
+      | 'rename'
+      | 'delete',
+    index?: number
+  ) => void;
+  readonly onDrop?: (source: string, index?: number) => void;
 }
 
 export const TreeOverlay = (props: TreeOverlayProps) => {
   const [scrollTop, setScrollTop] = createSignal(0);
   const [viewportHeight, setViewportHeight] = createSignal(1);
   const [scroller, setScroller] = createSignal<HTMLDivElement>();
+  const [menu, setMenu] = createSignal<{ x: number; y: number; index?: number }>();
+
+  const closeContextMenu = (): void => {
+    if (!menu()) return;
+    setMenu(undefined);
+    props.onContextMenuVisibilityChange?.(false);
+  };
+
+  const openContextMenu = (next: { x: number; y: number; index?: number }): void => {
+    setMenu(next);
+    props.onContextMenuVisibilityChange?.(true);
+  };
+
+  props.registerContextMenuDismiss?.(closeContextMenu);
 
   const virtualWindow = createMemo(() =>
     calculateVirtualWindow(props.rows.length, scrollTop(), viewportHeight())
@@ -51,6 +82,39 @@ export const TreeOverlay = (props: TreeOverlayProps) => {
 
   createEffect(() => {
     if (!props.visible) {
+      closeContextMenu();
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent): void => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      const insideMenu = target.closest('.tree-context-menu') !== null;
+      const insideTree = target.closest('.tree-overlay') !== null;
+      const insideDialog = target.closest('.vault-dialog-backdrop') !== null;
+      const insideNotice = target.closest('.operation-notice') !== null;
+      if (menu() && !insideMenu) closeContextMenu();
+      if (!insideTree && !insideMenu && !insideDialog && !insideNotice) {
+        props.onCloseRequest?.();
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    onCleanup(() => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+    });
+  });
+
+  const drop = (event: DragEvent, index?: number): void => {
+    event.preventDefault();
+    delete (event.currentTarget as HTMLElement).dataset.dragTarget;
+    const source = event.dataTransfer?.getData('text/folea-path');
+    if (source) props.onDrop?.(source, index);
+  };
+
+  createEffect(() => {
+    if (!props.visible) {
       return;
     }
 
@@ -77,7 +141,20 @@ export const TreeOverlay = (props: TreeOverlayProps) => {
         aria-label="Vault tree"
         data-search-active={props.searchActive === true}
       >
-        <div class="tree-overlay-header">
+        <div
+          class="tree-overlay-header"
+          data-testid="tree-root-drop"
+          onDragOver={(event) => {
+            event.preventDefault();
+            event.currentTarget.dataset.dragTarget = 'true';
+          }}
+          onDragLeave={(event) => delete event.currentTarget.dataset.dragTarget}
+          onDrop={(event) => drop(event)}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            openContextMenu({ x: event.clientX, y: event.clientY });
+          }}
+        >
           <span>vault</span>
           <span>{props.rows.length} rows</span>
         </div>
@@ -102,8 +179,31 @@ export const TreeOverlay = (props: TreeOverlayProps) => {
                     data-selected={entry.index === props.selectedIndex}
                     data-kind={entry.row.kind}
                     data-relpath={entry.row.relPath}
+                    data-marked={props.marks?.has(entry.row.relPath) === true}
+                    draggable={true}
                     style={{ 'padding-left': `${12 + entry.row.depth * 16}px` }}
                     onClick={() => props.onRowClick?.(entry.index)}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      openContextMenu({
+                        x: event.clientX,
+                        y: event.clientY,
+                        index: entry.index
+                      });
+                    }}
+                    onDragStart={(event) => {
+                      event.dataTransfer?.setData('text/folea-path', entry.row.relPath);
+                      if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+                    }}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      event.currentTarget.dataset.dragTarget = 'true';
+                    }}
+                    onDragLeave={(event) => delete event.currentTarget.dataset.dragTarget}
+                    onDrop={(event) => {
+                      event.stopPropagation();
+                      drop(event, entry.index);
+                    }}
                   >
                     <span class="tree-row-marker" aria-hidden="true">
                       {entry.row.kind === 'folder' ? (entry.row.expanded ? '-' : '+') : ''}
@@ -125,6 +225,64 @@ export const TreeOverlay = (props: TreeOverlayProps) => {
           </div>
         </Show>
       </aside>
+      <Show when={menu()} keyed>
+        {(current) => (
+          <div
+            class="tree-context-menu"
+            data-testid="tree-context-menu"
+            style={{ left: `${current.x}px`, top: `${current.y}px` }}
+          >
+            <For each={contextActions(props.rows[current.index ?? -1])}>
+              {(action) => (
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeContextMenu();
+                    props.onAction?.(
+                      action as
+                        | 'create-note'
+                        | 'create-directory'
+                        | 'open'
+                        | 'editor'
+                        | 'mark'
+                        | 'move'
+                        | 'rename'
+                        | 'delete',
+                      current.index
+                    );
+                  }}
+                >
+                  {action.replace('-', ' ')}
+                </button>
+              )}
+            </For>
+          </div>
+        )}
+      </Show>
     </Show>
   );
+};
+
+type TreeContextAction =
+  | 'create-note'
+  | 'create-directory'
+  | 'open'
+  | 'editor'
+  | 'mark'
+  | 'move'
+  | 'rename'
+  | 'delete';
+
+const contextActions = (row: TreeRow | undefined): readonly TreeContextAction[] => {
+  if (!row) return ['create-note', 'create-directory'];
+  return [
+    'create-note',
+    'create-directory',
+    'open',
+    ...(row.kind === 'note' ? (['editor'] as const) : []),
+    'mark',
+    'move',
+    'rename',
+    'delete'
+  ];
 };

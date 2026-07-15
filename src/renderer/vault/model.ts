@@ -25,6 +25,8 @@ export class VaultIndex {
     const safeChange = parseVaultChange(change);
 
     switch (safeChange.kind) {
+      case 'structural':
+        break;
       case 'created':
       case 'changed':
         this.upsert(safeChange.note);

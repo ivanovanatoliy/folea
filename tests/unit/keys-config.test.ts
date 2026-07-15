@@ -38,6 +38,23 @@ const defaults = (): KeymapSet => ({
 });
 
 describe('keys.config parser', () => {
+  it('keeps global remaps working when the templates keymap is present', () => {
+    const defaultsWithTemplates: KeymapSet = {
+      ...defaults(),
+      templates: new Map([
+        ['R', 'templates.rename'],
+        ['D', 'templates.delete']
+      ])
+    };
+    const parsed = parseKeysConfig(
+      'view.toggleTree t\ntemplates.rename r',
+      new Set([...known, 'templates.rename'])
+    );
+    const result = applyKeysConfigOverrides(defaultsWithTemplates, parsed);
+    expect(result.keymaps.global.get('t')).toBe('view.toggleTree');
+    expect(result.keymaps.global.has('<C-b>')).toBe(false);
+    expect(result.keymaps.templates?.get('r')).toBe('templates.rename');
+  });
   it('parses valid override lines', () => {
     const parsed = parseKeysConfig('document.scrollHalfDown <C-f>', known);
     expect(parsed.overrides).toEqual([

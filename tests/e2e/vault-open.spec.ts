@@ -149,7 +149,7 @@ test('reopens vault from recent list after closing', async () => {
     const page = await app.firstWindow();
 
     // Vault opens directly via FOLEA_TEST_VAULT_PATH
-    await expect(page.getByTestId('vault-status')).toHaveText('vault open');
+    await expect(page.getByTestId('statusline-doc')).toHaveText('notes.typ');
     await expectSurfaceRendered(page);
     await expect(page.getByTestId('typst-rendered-document')).toContainText('Reopen Test');
 

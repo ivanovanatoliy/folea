@@ -12,6 +12,7 @@ export interface KeymapSet {
   readonly links: KeymapLike;
   readonly quickOpen: KeymapLike;
   readonly global: KeymapLike;
+  readonly templates?: KeymapLike;
 }
 
 export interface KeyBindingOverride {
@@ -36,7 +37,8 @@ const CONTEXT_KEYS = [
   'outline',
   'links',
   'quickOpen',
-  'global'
+  'global',
+  'templates'
 ] as const;
 
 const CONTEXT_BY_COMMAND_NAMESPACE = new Map<string, keyof KeymapSet>([
@@ -53,7 +55,8 @@ const CONTEXT_BY_COMMAND_NAMESPACE = new Map<string, keyof KeymapSet>([
   ['zoom', 'document'],
   ['editor', 'document'],
   ['app', 'global'],
-  ['theme', 'global']
+  ['theme', 'global'],
+  ['templates', 'templates']
 ]);
 
 const NAMED_KEYS = new Set([
@@ -189,7 +192,8 @@ const cloneKeymaps = (defaults: KeymapSet): KeymapSet => ({
   outline: new Map(defaults.outline),
   links: new Map(defaults.links),
   quickOpen: new Map(defaults.quickOpen),
-  global: new Map(defaults.global)
+  global: new Map(defaults.global),
+  ...(defaults.templates ? { templates: new Map(defaults.templates) } : {})
 });
 
 const contextsForCommand = (
@@ -197,7 +201,9 @@ const contextsForCommand = (
   override: KeyBindingOverride
 ): (keyof KeymapSet)[] => {
   const found = CONTEXT_KEYS.filter((context) => {
-    for (const commandId of keymaps[context].values()) {
+    const keymap = keymaps[context];
+    if (!keymap) return false;
+    for (const commandId of keymap.values()) {
       if (commandId === override.commandId) {
         return true;
       }
@@ -232,6 +238,7 @@ export const applyKeysConfigOverrides = (
     for (const context of contexts) {
       const key = `${context}:${override.commandId}`;
       const keymap = keymaps[context];
+      if (!keymap) continue;
 
       if (!cleared.has(key)) {
         for (const [chord, commandId] of [...keymap.entries()]) {

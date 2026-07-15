@@ -1,7 +1,12 @@
 import chokidar, { type FSWatcher } from 'chokidar';
 import path from 'node:path';
 
-import { parseVaultChange, type VaultChange, type VaultPath } from '../../shared/ipc/vault';
+import {
+  parseVaultChange,
+  parseVaultDirectoryPath,
+  type VaultChange,
+  type VaultPath
+} from '../../shared/ipc/vault';
 import { noteMetaFromAbsolutePath } from './metadata';
 import {
   IGNORED_VAULT_DIRECTORIES,
@@ -12,10 +17,12 @@ import {
 } from './paths';
 
 const DELETE_COALESCE_MS = 150;
+const STRUCTURAL_DEBOUNCE_MS = 80;
 
 export class VaultWatcher {
   private watcher: FSWatcher | undefined;
   private readonly pendingDeletes = new Map<VaultPath, ReturnType<typeof setTimeout>>();
+  private structuralTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(
     private readonly root: OpenVaultRoot,
@@ -39,6 +46,12 @@ export class VaultWatcher {
       this.watcher.on('add', (absolutePath) => void this.handleAdd(absolutePath));
       this.watcher.on('change', (absolutePath) => void this.handleChange(absolutePath));
       this.watcher.on('unlink', (absolutePath) => this.handleUnlink(absolutePath));
+      this.watcher.on('addDir', (absolutePath) =>
+        this.handleDirectory(absolutePath, 'directory-created')
+      );
+      this.watcher.on('unlinkDir', (absolutePath) =>
+        this.handleDirectory(absolutePath, 'directory-deleted')
+      );
     });
 
     await ready;
@@ -49,6 +62,8 @@ export class VaultWatcher {
       clearTimeout(timer);
     }
     this.pendingDeletes.clear();
+    if (this.structuralTimer) clearTimeout(this.structuralTimer);
+    this.structuralTimer = undefined;
 
     if (this.watcher) {
       const watcher = this.watcher;
@@ -154,7 +169,30 @@ export class VaultWatcher {
     this.pendingDeletes.set(relPath, timer);
   }
 
+  private handleDirectory(
+    absolutePath: string,
+    action: 'directory-created' | 'directory-deleted'
+  ): void {
+    const rel = toPosixDirectory(this.root.realRoot, absolutePath);
+    if (!rel) return;
+    if (this.structuralTimer) clearTimeout(this.structuralTimer);
+    this.structuralTimer = setTimeout(() => {
+      this.structuralTimer = undefined;
+      this.safeEmit({ kind: 'structural', relPath: rel, action });
+    }, STRUCTURAL_DEBOUNCE_MS);
+  }
+
   private safeEmit(event: VaultChange): void {
     this.emit(parseVaultChange(event));
   }
 }
+
+const toPosixDirectory = (root: string, absolutePath: string): string | undefined => {
+  const resolved = path.resolve(absolutePath);
+  if (!isInsideOrEqual(root, resolved) || resolved === root) return undefined;
+  try {
+    return parseVaultDirectoryPath(path.relative(root, resolved).split(path.sep).join('/'));
+  } catch {
+    return undefined;
+  }
+};

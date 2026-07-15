@@ -27,6 +27,29 @@ export interface TreeView {
   selectLast(): void;
   appendSearchChar(char: string): void;
   backspaceSearch(): void;
+  createNote?(): void;
+  createNoteAtCurrent?(): void;
+  createDirectory?(): void;
+  renameSelection?(): void;
+  toggleMark?(): void;
+  clearMarks?(): void;
+  moveMarks?(): void;
+  deleteSelection?(): void;
+  manageTemplates?(): void;
+  closeTemplates?(): void;
+  nextTemplate?(): void;
+  previousTemplate?(): void;
+  openTemplate?(): void;
+  renameTemplate?(): void;
+  deleteTemplate?(): void;
+}
+
+export interface VaultDialogView {
+  cancel(): void;
+  submit(): void;
+  next(): void;
+  previous(): void;
+  ignore(): void;
 }
 
 export interface QuickOpenView {
@@ -136,6 +159,7 @@ export interface CommandContext {
   readonly quickOpen: QuickOpenView;
   readonly tree: TreeView;
   readonly vault: VaultView;
+  readonly vaultDialog?: VaultDialogView;
 }
 
 export type Command = {

@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
-import { parseVaultPath, type VaultPath } from '../../shared/ipc/vault';
+import { parseVaultEntryPath, parseVaultPath, type VaultPath } from '../../shared/ipc/vault';
 
 export class VaultPathError extends Error {
   constructor(message: string) {
@@ -27,8 +27,13 @@ export const IGNORED_VAULT_DIRECTORIES = new Set([
   '.git',
   'node_modules',
   '.folea',
-  '.folea-cache'
+  '.folea-cache',
+  '_templates'
 ]);
+
+export const RENDER_IGNORED_VAULT_DIRECTORIES = new Set(
+  [...IGNORED_VAULT_DIRECTORIES].filter((name) => name !== '_templates')
+);
 
 export const toPosixPath = (value: string): string => value.split(path.sep).join('/');
 
@@ -59,13 +64,29 @@ export const resolveRelativeNotePath = (
   root: OpenVaultRoot,
   relPath: unknown
 ): ResolvedNotePath => {
-  const safeRelPath = parseVaultPath(relPath);
+  const safeRelPath = parseVaultEntryPath(relPath);
+  if (!safeRelPath.endsWith('.typ')) {
+    throw new TypeError('Vault note path must target a .typ file');
+  }
   const absolutePath = path.resolve(root.realRoot, ...safeRelPath.split('/'));
 
   if (!isInsideOrEqual(root.realRoot, absolutePath)) {
     throw new VaultPathError('Vault path resolves outside the vault');
   }
 
+  return { relPath: safeRelPath, absolutePath };
+};
+
+export const resolveRelativeEntryPath = (
+  root: OpenVaultRoot,
+  relPath: unknown,
+  options: { readonly allowTemplates?: boolean } = {}
+): ResolvedNotePath => {
+  const safeRelPath = parseVaultEntryPath(relPath, options);
+  const absolutePath = path.resolve(root.realRoot, ...safeRelPath.split('/'));
+  if (!isInsideOrEqual(root.realRoot, absolutePath)) {
+    throw new VaultPathError('Vault path resolves outside the vault');
+  }
   return { relPath: safeRelPath, absolutePath };
 };
 
@@ -145,6 +166,35 @@ export const resolveNewNotePath = async (
     throw new VaultPathError('Vault note parent resolves outside the vault');
   }
 
+  return resolved;
+};
+
+export const resolveExistingEntryPath = async (
+  root: OpenVaultRoot,
+  relPath: unknown,
+  options: { readonly allowTemplates?: boolean } = {}
+): Promise<ResolvedNotePath> => {
+  const resolved = resolveRelativeEntryPath(root, relPath, options);
+  const realPath = await ensureRealPathInsideRoot(
+    root,
+    resolved.absolutePath,
+    'Vault entry symlink resolves outside the vault'
+  );
+  return { ...resolved, realPath };
+};
+
+export const resolveNewEntryPath = async (
+  root: OpenVaultRoot,
+  relPath: unknown,
+  options: { readonly allowTemplates?: boolean } = {}
+): Promise<ResolvedNotePath> => {
+  const resolved = resolveRelativeEntryPath(root, relPath, options);
+  const existingAncestor = await nearestExistingAncestor(path.dirname(resolved.absolutePath));
+  await ensureRealPathInsideRoot(
+    root,
+    existingAncestor,
+    'Vault entry parent symlink resolves outside the vault'
+  );
   return resolved;
 };
 

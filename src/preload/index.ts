@@ -38,10 +38,19 @@ import {
 } from '../shared/ipc/search';
 import { validateShellOpenExternalRequest, type FoleaShellBridge } from '../shared/ipc/shell';
 import {
+  createAnalyzeVaultOperationRequest,
+  createCreateDirectoryRequest,
   createCreateNoteRequest,
   createDeleteNoteRequest,
   createReadNoteRequest,
   createRenameNoteRequest,
+  createRenameVaultEntryRequest,
+  createMoveVaultEntriesRequest,
+  createTrashVaultEntriesRequest,
+  createVaultSnapshotRequest,
+  createVaultTemplatesRequest,
+  parseAnalyzeVaultOperationRequest,
+  parseCreateDirectoryRequest,
   parseCreateNoteRequest,
   parseDeleteNoteRequest,
   parseListNotesRequestArgs,
@@ -52,6 +61,15 @@ import {
   parseReadNoteRequest,
   parseReadNoteResponse,
   parseRenameNoteRequest,
+  parseRenameVaultEntryRequest,
+  parseMoveVaultEntriesRequest,
+  parseTrashVaultEntriesRequest,
+  parseMoveVaultEntriesResult,
+  parseTrashVaultEntriesResult,
+  parseVaultDirectory,
+  parseVaultOperationImpact,
+  parseVaultSnapshot,
+  parseVaultTemplateList,
   parseVaultChange,
   parseVaultHandle,
   parseVaultRenderFileList,
@@ -60,7 +78,14 @@ import {
   type DeleteNoteRequest,
   type ReadNoteRequest,
   type RenameNoteRequest,
+  type RenameVaultEntryRequest,
+  type MoveVaultEntriesRequest,
+  type TrashVaultEntriesRequest,
+  type CreateDirectoryRequest,
+  type AnalyzeVaultOperationRequest,
   VAULT_CHANGED_CHANNEL,
+  VAULT_ANALYZE_OPERATION_CHANNEL,
+  VAULT_CREATE_DIRECTORY_CHANNEL,
   VAULT_CREATE_CHANNEL,
   VAULT_DELETE_CHANNEL,
   VAULT_LIST_CHANNEL,
@@ -68,6 +93,11 @@ import {
   VAULT_READ_CHANNEL,
   VAULT_RENDER_FILES_CHANNEL,
   VAULT_RENAME_CHANNEL,
+  VAULT_RENAME_ENTRY_CHANNEL,
+  VAULT_MOVE_BATCH_CHANNEL,
+  VAULT_TRASH_BATCH_CHANNEL,
+  VAULT_SNAPSHOT_CHANNEL,
+  VAULT_TEMPLATES_CHANNEL,
   type VaultChange
 } from '../shared/ipc/vault';
 import {
@@ -243,6 +273,20 @@ const bridge: FoleaBridge = Object.freeze({
       const response = await ipcRenderer.invoke(VAULT_LIST_CHANNEL, request);
       return parseNoteMetaList(response);
     },
+    snapshot: async () => {
+      const response = await ipcRenderer.invoke(
+        VAULT_SNAPSHOT_CHANNEL,
+        createVaultSnapshotRequest()
+      );
+      return parseVaultSnapshot(response);
+    },
+    templates: async () => {
+      const response = await ipcRenderer.invoke(
+        VAULT_TEMPLATES_CHANNEL,
+        createVaultTemplatesRequest()
+      );
+      return parseVaultTemplateList(response);
+    },
     renderFiles: async (...args: []) => {
       const request = parseListRenderFilesRequestArgs(args);
       const response = await ipcRenderer.invoke(VAULT_RENDER_FILES_CHANNEL, request);
@@ -275,6 +319,41 @@ const bridge: FoleaBridge = Object.freeze({
         createDeleteNoteRequest(parseDeleteNoteRequest(request))
       );
       parseVoidResponse(response);
+    },
+    createDirectory: async (request: CreateDirectoryRequest) => {
+      const response = await ipcRenderer.invoke(
+        VAULT_CREATE_DIRECTORY_CHANNEL,
+        createCreateDirectoryRequest(parseCreateDirectoryRequest(request))
+      );
+      return parseVaultDirectory(response);
+    },
+    analyzeOperation: async (request: AnalyzeVaultOperationRequest) => {
+      const response = await ipcRenderer.invoke(
+        VAULT_ANALYZE_OPERATION_CHANNEL,
+        createAnalyzeVaultOperationRequest(parseAnalyzeVaultOperationRequest(request))
+      );
+      return parseVaultOperationImpact(response);
+    },
+    renameEntry: async (request: RenameVaultEntryRequest) => {
+      const response = await ipcRenderer.invoke(
+        VAULT_RENAME_ENTRY_CHANNEL,
+        createRenameVaultEntryRequest(parseRenameVaultEntryRequest(request))
+      );
+      return parseMoveVaultEntriesResult(response);
+    },
+    moveBatch: async (request: MoveVaultEntriesRequest) => {
+      const response = await ipcRenderer.invoke(
+        VAULT_MOVE_BATCH_CHANNEL,
+        createMoveVaultEntriesRequest(parseMoveVaultEntriesRequest(request))
+      );
+      return parseMoveVaultEntriesResult(response);
+    },
+    trashBatch: async (request: TrashVaultEntriesRequest) => {
+      const response = await ipcRenderer.invoke(
+        VAULT_TRASH_BATCH_CHANNEL,
+        createTrashVaultEntriesRequest(parseTrashVaultEntriesRequest(request))
+      );
+      return parseTrashVaultEntriesResult(response);
     },
     onChanged: (callback: (event: VaultChange) => void) => {
       if (typeof callback !== 'function') {

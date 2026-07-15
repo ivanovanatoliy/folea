@@ -11,6 +11,8 @@ import {
   SEARCH_START_CHANNEL
 } from '../shared/ipc/search';
 import {
+  parseAnalyzeVaultOperationInvokeRequest,
+  parseCreateDirectoryInvokeRequest,
   parseCreateNoteInvokeRequest,
   parseDeleteNoteInvokeRequest,
   parseListRenderFilesInvokeRequest,
@@ -21,18 +23,36 @@ import {
   parseReadNoteInvokeRequest,
   parseReadNoteResponse,
   parseRenameNoteInvokeRequest,
+  parseRenameVaultEntryInvokeRequest,
+  parseMoveVaultEntriesInvokeRequest,
+  parseTrashVaultEntriesInvokeRequest,
+  parseMoveVaultEntriesResult,
+  parseTrashVaultEntriesResult,
+  parseVaultDirectory,
+  parseVaultOperationImpact,
+  parseVaultSnapshot,
+  parseVaultSnapshotInvokeRequest,
+  parseVaultTemplateList,
+  parseVaultTemplatesInvokeRequest,
   parseVaultChange,
   parseVaultHandle,
   parseVaultRenderFileList,
   parseVoidResponse,
   VAULT_CHANGED_CHANNEL,
+  VAULT_ANALYZE_OPERATION_CHANNEL,
+  VAULT_CREATE_DIRECTORY_CHANNEL,
   VAULT_CREATE_CHANNEL,
   VAULT_DELETE_CHANNEL,
   VAULT_LIST_CHANNEL,
   VAULT_OPEN_CHANNEL,
   VAULT_READ_CHANNEL,
   VAULT_RENDER_FILES_CHANNEL,
-  VAULT_RENAME_CHANNEL
+  VAULT_RENAME_CHANNEL,
+  VAULT_RENAME_ENTRY_CHANNEL,
+  VAULT_MOVE_BATCH_CHANNEL,
+  VAULT_TRASH_BATCH_CHANNEL,
+  VAULT_SNAPSHOT_CHANNEL,
+  VAULT_TEMPLATES_CHANNEL
 } from '../shared/ipc/vault';
 import { validateShellOpenExternalRequest } from '../shared/ipc/shell';
 import {
@@ -314,6 +334,18 @@ export const registerIpcHandlers = (): void => {
     return parseNoteMetaList(await vaultService.list());
   });
 
+  ipcMain.removeHandler(VAULT_SNAPSHOT_CHANNEL);
+  ipcMain.handle(VAULT_SNAPSHOT_CHANNEL, async (_event, request: unknown) => {
+    parseVaultSnapshotInvokeRequest(request);
+    return parseVaultSnapshot(await vaultService.snapshot());
+  });
+
+  ipcMain.removeHandler(VAULT_TEMPLATES_CHANNEL);
+  ipcMain.handle(VAULT_TEMPLATES_CHANNEL, async (_event, request: unknown) => {
+    parseVaultTemplatesInvokeRequest(request);
+    return parseVaultTemplateList(await vaultService.templates());
+  });
+
   ipcMain.removeHandler(VAULT_RENDER_FILES_CHANNEL);
   ipcMain.handle(VAULT_RENDER_FILES_CHANNEL, async (_event, request: unknown) => {
     parseListRenderFilesInvokeRequest(request);
@@ -343,6 +375,51 @@ export const registerIpcHandlers = (): void => {
     const parsedRequest = parseDeleteNoteInvokeRequest(request);
     await vaultService.delete(parsedRequest);
     return parseVoidResponse(undefined);
+  });
+
+  ipcMain.removeHandler(VAULT_CREATE_DIRECTORY_CHANNEL);
+  ipcMain.handle(VAULT_CREATE_DIRECTORY_CHANNEL, async (_event, request: unknown) => {
+    return parseVaultDirectory(
+      await vaultService.createDirectory(parseCreateDirectoryInvokeRequest(request))
+    );
+  });
+
+  ipcMain.removeHandler(VAULT_ANALYZE_OPERATION_CHANNEL);
+  ipcMain.handle(VAULT_ANALYZE_OPERATION_CHANNEL, async (_event, request: unknown) => {
+    return parseVaultOperationImpact(
+      await vaultService.analyzeOperation(parseAnalyzeVaultOperationInvokeRequest(request))
+    );
+  });
+
+  ipcMain.removeHandler(VAULT_RENAME_ENTRY_CHANNEL);
+  ipcMain.handle(VAULT_RENAME_ENTRY_CHANNEL, async (_event, request: unknown) => {
+    const result = await vaultService.renameEntry(parseRenameVaultEntryInvokeRequest(request));
+    if (vaultStateManager) {
+      await vaultStateManager.update({ type: 'pathsMoved', mappings: result.mappings });
+      await vaultStateManager.invalidateRenderCache(result.mappings.map((mapping) => mapping.from));
+    }
+    return parseMoveVaultEntriesResult(result);
+  });
+
+  ipcMain.removeHandler(VAULT_MOVE_BATCH_CHANNEL);
+  ipcMain.handle(VAULT_MOVE_BATCH_CHANNEL, async (_event, request: unknown) => {
+    const result = await vaultService.moveBatch(parseMoveVaultEntriesInvokeRequest(request));
+    if (vaultStateManager) {
+      await vaultStateManager.update({ type: 'pathsMoved', mappings: result.mappings });
+      await vaultStateManager.invalidateRenderCache(result.mappings.map((mapping) => mapping.from));
+    }
+    return parseMoveVaultEntriesResult(result);
+  });
+
+  ipcMain.removeHandler(VAULT_TRASH_BATCH_CHANNEL);
+  ipcMain.handle(VAULT_TRASH_BATCH_CHANNEL, async (_event, request: unknown) => {
+    const result = await vaultService.trashBatch(parseTrashVaultEntriesInvokeRequest(request));
+    const removed = result.results.filter((item) => item.success).map((item) => item.source);
+    if (vaultStateManager && removed.length > 0) {
+      await vaultStateManager.update({ type: 'pathsRemoved', relPaths: removed });
+      await vaultStateManager.invalidateRenderCache(removed);
+    }
+    return parseTrashVaultEntriesResult(result);
   });
 
   // ── Search ───────────────────────────────────────────────────────────────────

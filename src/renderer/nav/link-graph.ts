@@ -102,6 +102,9 @@ export function buildLinkGraph(
   const outgoingMap = new Map<VaultPath, LinkEdge[]>();
 
   for (const [relPath, source] of files) {
+    // Render snapshots also contain templates and compiler dependencies. They are
+    // intentionally absent from the user navigation graph.
+    if (!noteSet.has(relPath)) continue;
     for (const ref of parseRefs(source)) {
       const resolved = resolveNoteHref(ref.rawTarget, relPath, noteSet);
       if (resolved === null) continue;

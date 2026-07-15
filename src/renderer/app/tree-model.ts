@@ -1,4 +1,4 @@
-import type { NoteMeta } from '../../shared/ipc/vault';
+import type { NoteMeta, VaultDirectory } from '../../shared/ipc/vault';
 
 export type TreeNode =
   | {
@@ -44,8 +44,25 @@ interface MutableFolder {
 export const TREE_ROW_HEIGHT = 28;
 export const TREE_OVERSCAN_ROWS = 6;
 
-export const buildTree = (notes: readonly NoteMeta[]): readonly TreeNode[] => {
+export const buildTree = (
+  notes: readonly NoteMeta[],
+  directories: readonly VaultDirectory[] = []
+): readonly TreeNode[] => {
   const root: MutableFolder = { children: new Map<string, MutableFolder | NoteMeta>() };
+
+  for (const directory of directories) {
+    let folder = root;
+    for (const part of directory.relPath.split('/')) {
+      const existing = folder.children.get(part);
+      if (isMutableFolder(existing)) {
+        folder = existing;
+      } else {
+        const next: MutableFolder = { children: new Map() };
+        folder.children.set(part, next);
+        folder = next;
+      }
+    }
+  }
 
   for (const note of notes) {
     const parts = note.relPath.split('/').filter((part) => part.length > 0);
@@ -71,6 +88,27 @@ export const buildTree = (notes: readonly NoteMeta[]): readonly TreeNode[] => {
 
   return materializeChildren(root, '');
 };
+
+export const toggleTreeMark = (
+  marks: ReadonlySet<string>,
+  relPath: string
+): ReadonlySet<string> => {
+  const next = new Set(marks);
+  if (next.has(relPath)) next.delete(relPath);
+  else next.add(relPath);
+  return next;
+};
+
+export const pruneTreeMarks = (
+  marks: ReadonlySet<string>,
+  rows: readonly Pick<TreeRow, 'relPath'>[]
+): ReadonlySet<string> => {
+  const available = new Set(rows.map((row) => row.relPath));
+  return new Set([...marks].filter((mark) => available.has(mark)));
+};
+
+export const dragSources = (relPath: string, marks: ReadonlySet<string>): readonly string[] =>
+  marks.has(relPath) ? [...marks] : [relPath];
 
 export const flattenTree = (
   nodes: readonly TreeNode[],

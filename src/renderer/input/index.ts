@@ -19,6 +19,7 @@ export type {
   ZoomView,
   QuickOpenView,
   VaultView,
+  VaultDialogView,
   CommandContext,
   Command,
   DispatchResult
@@ -40,6 +41,8 @@ export {
   QUICK_OPEN_KEYMAP,
   SEARCH_KEYMAP,
   TREE_SEARCH_KEYMAP,
+  TEMPLATES_KEYMAP,
+  VAULT_DIALOG_KEYMAP,
   VISUAL_KEYMAP,
   TREE_KEYMAP
 } from './bindings';

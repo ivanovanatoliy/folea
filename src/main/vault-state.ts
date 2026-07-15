@@ -194,6 +194,61 @@ export const applyVaultStatePatch = (
       return { ...current, updatedAt: now, lastOpenedNote, recentNotes, notePositions };
     }
 
+    case 'pathsMoved': {
+      const mappings = new Map(patch.mappings.map((mapping) => [mapping.from, mapping.to]));
+      const mapPath = (relPath: string): string => {
+        const direct = mappings.get(relPath);
+        if (direct) return direct;
+        for (const [from, to] of [...mappings].sort(([a], [b]) => b.length - a.length)) {
+          if (relPath.startsWith(`${from}/`)) return `${to}${relPath.slice(from.length)}`;
+        }
+        return relPath;
+      };
+      const recentNotes = current.recentNotes.map((note) => ({
+        ...note,
+        relPath: mapPath(note.relPath)
+      }));
+      const notePositions: Record<VaultPath, NotePositionState> = {};
+      for (const [relPath, position] of Object.entries(current.notePositions)) {
+        const mapped = mapPath(relPath);
+        notePositions[mapped] = { ...position, relPath: mapped };
+      }
+      return {
+        ...current,
+        updatedAt: now,
+        lastOpenedNote: current.lastOpenedNote ? mapPath(current.lastOpenedNote) : null,
+        recentNotes,
+        notePositions,
+        lastCreationTemplate: current.lastCreationTemplate
+          ? mapPath(current.lastCreationTemplate)
+          : null
+      };
+    }
+
+    case 'pathsRemoved': {
+      const removed = (relPath: string): boolean =>
+        patch.relPaths.some((source) => relPath === source || relPath.startsWith(`${source}/`));
+      const notePositions = { ...current.notePositions };
+      for (const relPath of Object.keys(notePositions)) {
+        if (removed(relPath)) delete notePositions[relPath];
+      }
+      return {
+        ...current,
+        updatedAt: now,
+        lastOpenedNote:
+          current.lastOpenedNote && removed(current.lastOpenedNote) ? null : current.lastOpenedNote,
+        recentNotes: current.recentNotes.filter((note) => !removed(note.relPath)),
+        notePositions,
+        lastCreationTemplate:
+          current.lastCreationTemplate && removed(current.lastCreationTemplate)
+            ? null
+            : current.lastCreationTemplate
+      };
+    }
+
+    case 'templateSelected':
+      return { ...current, updatedAt: now, lastCreationTemplate: patch.relPath };
+
     default: {
       const _exhaustive: never = patch;
       throw new Error(`Unknown vault state patch: ${(_exhaustive as VaultStatePatch).type}`);
@@ -384,6 +439,28 @@ export const writeRenderCache = async (
   await saveManifest(vaultRoot, evicted);
 };
 
+export const invalidateRenderCache = async (
+  vaultRoot: string,
+  relPaths: readonly string[]
+): Promise<void> => {
+  const manifest = await loadManifest(vaultRoot);
+  const entries = { ...manifest.entries };
+  for (const [key, entry] of Object.entries(entries)) {
+    const affected = relPaths.some(
+      (relPath) =>
+        entry.relPath === relPath ||
+        entry.relPath.startsWith(`${relPath}/`) ||
+        entry.inputFiles.some(
+          (input) => input.relPath === relPath || input.relPath.startsWith(`${relPath}/`)
+        )
+    );
+    if (!affected) continue;
+    delete entries[key];
+    await fs.unlink(getEntryPath(vaultRoot, key)).catch(() => undefined);
+  }
+  await saveManifest(vaultRoot, { ...manifest, updatedAt: new Date().toISOString(), entries });
+};
+
 // ── Vault state manager (per open vault) ──────────────────────────────────────
 
 export class VaultStateManager {
@@ -408,6 +485,10 @@ export class VaultStateManager {
 
   async writeRenderCache(request: WriteRenderCacheRequest): Promise<void> {
     return writeRenderCache(this.vaultRoot, request);
+  }
+
+  async invalidateRenderCache(relPaths: readonly string[]): Promise<void> {
+    await invalidateRenderCache(this.vaultRoot, relPaths);
   }
 
   getState(): VaultStateFileV1 {

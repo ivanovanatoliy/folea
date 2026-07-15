@@ -274,7 +274,7 @@ test('opens a configured vault, lists notes, and renders the selected note', asy
     const page = await app.firstWindow();
     await installCspViolationRecorder(page);
 
-    await expect(page.getByTestId('vault-status')).toHaveText('vault open');
+    await expect(page.getByTestId('statusline-doc')).toHaveText('alpha.typ');
     await expectSurfaceRendered(page);
     await expect(page.getByTestId('typst-rendered-document')).toContainText('Alpha');
     await expect(page.getByTestId('typst-rendered-document')).toContainText('Hello from folea.');
@@ -286,7 +286,7 @@ test('opens a configured vault, lists notes, and renders the selected note', asy
       .toBe('= Beta\n');
 
     await page.keyboard.press('Control+b');
-    await expect(page.getByTestId('statusline-mode')).toHaveText('tree');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[tree]');
     await expect(page.getByTestId('tree-selected-row')).toHaveCount(1);
     await expect.poll(() => page.getByTestId('tree-row').count()).toBeGreaterThan(7);
     await expect(page.getByTestId('tree-overlay')).toContainText('alpha.typ');
@@ -308,7 +308,7 @@ test('opens a configured vault, lists notes, and renders the selected note', asy
         })
     );
     await page.keyboard.press('Enter');
-    await expect(page.getByTestId('statusline-mode')).toHaveText('document');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[document]');
     await expect(page.getByTestId('typst-rendered-document')).toContainText('Beta');
     await expect(betaCachedRender).resolves.toBe(true);
 
@@ -341,7 +341,7 @@ test('opens a configured vault, lists notes, and renders the selected note', asy
     await expect(cachedRender).resolves.toMatchObject({ fromCache: true });
 
     await page.keyboard.press(':');
-    await expect(page.getByTestId('statusline-mode')).toHaveText('palette');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[palette]');
     const paletteBox = await page.getByTestId('palette-overlay').boundingBox();
     const viewport = page.viewportSize();
     expect(paletteBox && viewport ? Math.round(paletteBox.x + paletteBox.width / 2) : 0).toBe(
@@ -363,7 +363,7 @@ test('opens a configured vault, lists notes, and renders the selected note', asy
     await page.keyboard.type('document.outline');
     await expect(page.getByTestId('palette-input')).toHaveValue('document.outline');
     await page.keyboard.press('Enter');
-    await expect(page.getByTestId('statusline-mode')).toHaveText('outline');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[outline]');
     await expect(page.getByTestId('outline-overlay')).toContainText('Alpha');
     await expect(page.getByTestId('outline-overlay')).toContainText('Details');
     const outlineScrollBefore = await page
@@ -377,7 +377,7 @@ test('opens a configured vault, lists notes, and renders the selected note', asy
     );
 
     await page.keyboard.press('/');
-    await expect(page.getByTestId('statusline-mode')).toHaveText('search');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[search]');
     await expect(page.getByTestId('search-overlay')).toContainText('file search');
     const localSearchScrollBefore = await page
       .getByTestId('typst-surface')
@@ -388,7 +388,7 @@ test('opens a configured vault, lists notes, and renders the selected note', asy
     await expect(page.getByTestId('search-overlay')).toContainText('alpha.typ');
     await expect(page.getByTestId('search-overlay')).not.toContainText('nested/beta.typ');
     await page.keyboard.press('Enter');
-    await expect(page.getByTestId('statusline-mode')).toHaveText('document');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[document]');
     await expect(page.getByTestId('surface-search-highlight')).toHaveCount(1);
     await page.waitForFunction(
       (prev) => (document.querySelector('[data-testid="typst-surface"]')?.scrollTop ?? 0) > prev,
@@ -396,7 +396,7 @@ test('opens a configured vault, lists notes, and renders the selected note', asy
     );
 
     await page.keyboard.press('Control+p');
-    await expect(page.getByTestId('statusline-mode')).toHaveText('quick-open');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[quick-open]');
     await expect(page.getByTestId('quick-open-overlay')).toContainText('recent notes');
     await page.keyboard.type('Beta');
     await expect(page.getByTestId('quick-open-input')).toHaveValue('Beta');
@@ -404,15 +404,206 @@ test('opens a configured vault, lists notes, and renders the selected note', asy
     await expect.poll(() => page.getByTestId('quick-open-row').count()).toBeGreaterThan(0);
     await expect(page.getByTestId('quick-open-overlay')).toContainText('nested/beta.typ');
     await page.keyboard.press('Enter');
-    await expect(page.getByTestId('statusline-mode')).toHaveText('document');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[document]');
     await expect(page.getByTestId('typst-rendered-document')).toContainText('Beta');
 
-    await page.evaluate(() =>
-      window.folea.vault.create({ relPath: 'created.typ', contents: '= Created\n' })
+    await page.keyboard.press('Control+n');
+    await expect(page.getByTestId('vault-operation-dialog')).toHaveAttribute(
+      'aria-label',
+      'Create note'
     );
+    await page.getByTestId('vault-dialog-input').fill('created');
+    await page.getByTestId('vault-dialog-submit').click();
+    await expect(page.getByTestId('vault-operation-dialog')).toHaveAttribute(
+      'aria-label',
+      'Choose template'
+    );
+    await expect(page.getByTestId('vault-template-choice').first()).toHaveAttribute(
+      'data-selected',
+      'true'
+    );
+    await page.getByTestId('vault-dialog-submit').click();
+    await expect
+      .poll(() =>
+        fs.readFile(path.join(vaultRoot, 'nested', 'created.typ'), 'utf8').catch(() => undefined)
+      )
+      .toBe('');
+    await expect(page.getByTestId('statusline-doc')).toHaveText('created.typ');
     await page.keyboard.press('Control+b');
     await expect(page.getByTestId('tree-overlay')).toContainText('created.typ');
     await expectNoCspViolations(page);
+  } finally {
+    await fs.rm(vaultRoot, { recursive: true, force: true });
+  }
+});
+
+test('creates notes and directories through the real tree UI and dismisses its context menu', async () => {
+  const vaultRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'folea-e2e-management-'));
+  await fs.mkdir(path.join(vaultRoot, '_templates'));
+  await fs.writeFile(path.join(vaultRoot, 'alpha.typ'), '= Alpha\n', 'utf8');
+  await fs.writeFile(
+    path.join(vaultRoot, '_templates', 'starter.typ'),
+    '#import "template-helper.typ": helper\n= Created from template\n#helper()\n',
+    'utf8'
+  );
+  await fs.writeFile(
+    path.join(vaultRoot, '_templates', 'template-helper.typ'),
+    '#let helper() = [Template helper]\n',
+    'utf8'
+  );
+
+  try {
+    const app = await launchApp({
+      ...currentEnv(),
+      FOLEA_ALLOW_TEST_VAULT_OPEN: '1',
+      FOLEA_TEST_VAULT_PATH: vaultRoot,
+      FOLEA_TEST_TRASH_DELETE: '1'
+    });
+    const page = await app.firstWindow();
+    const nativeDialogs: string[] = [];
+    page.on('dialog', (dialog) => {
+      nativeDialogs.push(dialog.type());
+      void dialog.dismiss();
+    });
+    await expectSurfaceRendered(page);
+
+    await page.keyboard.press('Control+b');
+    await expect(page.getByTestId('tree-overlay')).toBeVisible();
+
+    await page.keyboard.type('%');
+    await expect(page.getByTestId('vault-operation-dialog')).toHaveAttribute(
+      'aria-label',
+      'Create note'
+    );
+    await page.getByTestId('vault-dialog-input').fill('keyboard-note');
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('vault-operation-dialog')).toHaveAttribute(
+      'aria-label',
+      'Choose template'
+    );
+    await page.keyboard.press('Enter');
+    await expect
+      .poll(() =>
+        fs.readFile(path.join(vaultRoot, 'keyboard-note.typ'), 'utf8').catch(() => undefined)
+      )
+      .toBe('');
+    await expect(page.getByTestId('statusline-doc')).toHaveText('keyboard-note.typ');
+    await expect(page.getByTestId('tree-overlay')).toContainText('keyboard-note.typ');
+
+    await page.keyboard.press('d');
+    await expect(page.getByTestId('vault-operation-dialog')).toHaveAttribute(
+      'aria-label',
+      'Create directory'
+    );
+    await page.getByTestId('vault-dialog-input').fill('keyboard-folder');
+    await page.keyboard.press('Enter');
+    await expect
+      .poll(() =>
+        fs
+          .stat(path.join(vaultRoot, 'keyboard-folder'))
+          .then((entry) => entry.isDirectory())
+          .catch(() => false)
+      )
+      .toBe(true);
+    await expect(page.getByTestId('tree-overlay')).toContainText('keyboard-folder');
+
+    const keyboardFolderRow = page.locator(
+      '[data-testid="tree-row"][data-relpath="keyboard-folder"]'
+    );
+    await keyboardFolderRow.click({ button: 'right' });
+    await expect(page.getByTestId('tree-context-menu')).toBeVisible();
+    await page.getByRole('button', { name: 'create note', exact: true }).click();
+    await page.getByTestId('vault-dialog-input').fill('context-note');
+    await page.getByTestId('vault-dialog-submit').click();
+    await page.getByTestId('vault-template-choice').filter({ hasText: 'starter' }).click();
+    await page.getByTestId('vault-dialog-submit').click();
+    await expect
+      .poll(() =>
+        fs
+          .readFile(path.join(vaultRoot, 'keyboard-folder', 'context-note.typ'), 'utf8')
+          .catch(() => undefined)
+      )
+      .toBe(
+        '#import "../_templates/template-helper.typ": helper\n= Created from template\n#helper()\n'
+      );
+    await expect(page.getByTestId('statusline-doc')).toHaveText('context-note.typ');
+    await expectSurfaceRendered(page);
+    await expect(page.getByTestId('typst-rendered-document')).toContainText(
+      'Created from template'
+    );
+    await expect(page.getByTestId('typst-rendered-document')).toContainText('Template helper');
+
+    await keyboardFolderRow.click({ button: 'right' });
+    await page.getByRole('button', { name: 'create note', exact: true }).click();
+    await page.getByTestId('vault-dialog-input').fill('context-note');
+    await page.getByTestId('vault-dialog-submit').click();
+    await page.getByTestId('vault-dialog-submit').click();
+    await expect(page.getByTestId('operation-notice')).toBeVisible();
+    await page.getByRole('button', { name: 'Dismiss notification' }).click();
+
+    await page.getByTestId('tree-root-drop').click({ button: 'right' });
+    await page.getByRole('button', { name: 'create directory', exact: true }).click();
+    await page.getByTestId('vault-dialog-input').fill('context-folder');
+    await page.getByTestId('vault-dialog-submit').click();
+    await expect
+      .poll(() =>
+        fs
+          .stat(path.join(vaultRoot, 'context-folder'))
+          .then((entry) => entry.isDirectory())
+          .catch(() => false)
+      )
+      .toBe(true);
+    await expect(page.getByTestId('tree-overlay')).toContainText('context-folder');
+
+    const alphaRow = page.locator('[data-testid="tree-row"][data-relpath="alpha.typ"]');
+    await alphaRow.click({ button: 'right' });
+    await expect(page.getByTestId('tree-context-menu')).toBeVisible();
+    await page.getByTestId('tree-root-drop').click();
+    await expect(page.getByTestId('tree-context-menu')).toHaveCount(0);
+    await expect(page.getByTestId('tree-overlay')).toBeVisible();
+
+    await alphaRow.click({ button: 'right' });
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('tree-context-menu')).toHaveCount(0);
+    await expect(page.getByTestId('tree-overlay')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('tree-overlay')).toHaveCount(0);
+
+    await page.keyboard.press('Control+b');
+    const contextNoteRow = page.locator(
+      '[data-testid="tree-row"][data-relpath="keyboard-folder/context-note.typ"]'
+    );
+    await contextNoteRow.click({ button: 'right' });
+    await page.getByRole('button', { name: 'delete', exact: true }).click();
+    await expect(page.getByTestId('vault-operation-dialog')).toHaveAttribute(
+      'aria-label',
+      'Move to trash'
+    );
+    await page.getByTestId('vault-dialog-cancel').click();
+    await expect(
+      fs.stat(path.join(vaultRoot, 'keyboard-folder', 'context-note.typ'))
+    ).resolves.toBeDefined();
+
+    await contextNoteRow.click({ button: 'right' });
+    await page.getByRole('button', { name: 'delete', exact: true }).click();
+    await page.getByTestId('vault-dialog-submit').click();
+    await expect
+      .poll(() =>
+        fs
+          .stat(path.join(vaultRoot, 'keyboard-folder', 'context-note.typ'))
+          .then(() => true)
+          .catch(() => false)
+      )
+      .toBe(false);
+
+    await page.getByTestId('tree-root-drop').click({ button: 'right' });
+    await expect(page.getByTestId('tree-context-menu')).toBeVisible();
+    const surfaceBox = await page.getByTestId('typst-surface').boundingBox();
+    if (!surfaceBox) throw new Error('The document surface has no bounding box');
+    await page.mouse.click(surfaceBox.x + surfaceBox.width - 20, surfaceBox.y + 80);
+    await expect(page.getByTestId('tree-context-menu')).toHaveCount(0);
+    await expect(page.getByTestId('tree-overlay')).toHaveCount(0);
+    expect(nativeDialogs).toEqual([]);
   } finally {
     await fs.rm(vaultRoot, { recursive: true, force: true });
   }
@@ -433,7 +624,7 @@ test('modal input: status line shows active context and scroll keys move the sur
     });
     const page = await app.firstWindow();
 
-    await expect(page.getByTestId('statusline-mode')).toHaveText('document');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[document]');
 
     await expectSurfaceRendered(page);
     await expect(page.getByTestId('statusline-page')).toHaveText(/\[1\/\d+\]/);
@@ -446,7 +637,7 @@ test('modal input: status line shows active context and scroll keys move the sur
       .toBe('none');
 
     await page.keyboard.press('Control+b');
-    await expect(page.getByTestId('statusline-mode')).toHaveText('tree');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[tree]');
     const treeScrollTopBefore = await page
       .getByTestId('typst-surface')
       .evaluate((el) => el.scrollTop);
@@ -456,7 +647,7 @@ test('modal input: status line shows active context and scroll keys move the sur
       treeScrollTopBefore
     );
     await page.keyboard.press('Control+b');
-    await expect(page.getByTestId('statusline-mode')).toHaveText('document');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[document]');
 
     const scrollTopBefore = await page.getByTestId('typst-surface').evaluate((el) => el.scrollTop);
     await page.keyboard.press('j');
@@ -537,7 +728,7 @@ test('editor commands appear in the command palette', async () => {
   await expect(page.getByTestId('folea-shell')).toBeVisible();
 
   await page.keyboard.press(':');
-  await expect(page.getByTestId('statusline-mode')).toHaveText('palette');
+  await expect(page.getByTestId('statusline-mode')).toHaveText('[palette]');
 
   await page.keyboard.type('Open in editor');
   await expect
@@ -585,22 +776,29 @@ test('loads theme and key remaps from config files', async () => {
     await expect(page.locator(':root')).toHaveAttribute('data-theme', 'dark');
     await expectSurfaceRendered(page);
 
+    // keys.config loads asynchronously; wait until the palette exposes the remap.
+    await page.keyboard.press(':');
+    await page.keyboard.type('Toggle tree');
+    await expect(page.getByTestId('palette-results')).toContainText('t');
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[document]');
+
     await page.keyboard.press('Control+b');
     await expect(page.getByTestId('tree-overlay')).toHaveCount(0);
 
     await page.keyboard.press('t');
-    await expect(page.getByTestId('statusline-mode')).toHaveText('tree');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[tree]');
     await expect(page.getByTestId('tree-overlay')).toBeVisible();
     await page.keyboard.press('Escape');
-    await expect(page.getByTestId('statusline-mode')).toHaveText('document');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[document]');
 
     await page.keyboard.press(':');
-    await expect(page.getByTestId('statusline-mode')).toHaveText('palette');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[palette]');
     await page.keyboard.type('Toggle tree');
     await expect(page.getByTestId('palette-results')).toContainText('Toggle tree');
     await expect(page.getByTestId('palette-results')).toContainText('t');
     await page.keyboard.press('Escape');
-    await expect(page.getByTestId('statusline-mode')).toHaveText('document');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[document]');
 
     await page.keyboard.press(':');
     await page.keyboard.type('Use light theme');
@@ -650,7 +848,7 @@ test('links panel: b opens overlay, shows backlinks + outgoing, Enter opens note
 
     // Open the links panel
     await page.keyboard.press('b');
-    await expect(page.getByTestId('statusline-mode')).toHaveText('links');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[links]');
     await expect(page.getByTestId('links-overlay')).toBeVisible();
 
     // alpha.typ is linked from beta.typ (backlink) and links to beta.typ (outgoing).
@@ -669,7 +867,7 @@ test('links panel: b opens overlay, shows backlinks + outgoing, Enter opens note
     // Navigate to the first selected row and open it (selectedIndex=0, backlinks section first)
     // beta.typ appears in backlinks (since beta links to alpha)
     await page.keyboard.press('Enter');
-    await expect(page.getByTestId('statusline-mode')).toHaveText('document');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[document]');
     // After Enter, beta.typ should be rendered
     await expectSurfaceRendered(page);
     await expect(page.getByTestId('typst-rendered-document')).toContainText('Beta');
@@ -699,11 +897,11 @@ test('links panel: Escape closes overlay without navigating', async () => {
     await expectSurfaceRendered(page);
 
     await page.keyboard.press('b');
-    await expect(page.getByTestId('statusline-mode')).toHaveText('links');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[links]');
     await expect(page.getByTestId('links-overlay')).toBeVisible();
 
     await page.keyboard.press('Escape');
-    await expect(page.getByTestId('statusline-mode')).toHaveText('document');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[document]');
     await expect(page.getByTestId('links-overlay')).not.toBeVisible();
 
     // Original note is still displayed

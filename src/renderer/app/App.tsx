@@ -3,19 +3,28 @@ import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from
 import { LinksOverlay } from './LinksOverlay';
 import { Logo } from './Logo';
 import { OutlineOverlay } from './OutlineOverlay';
+import { OperationNotice, type OperationNoticeValue } from './OperationNotice';
 import { PaletteOverlay } from './PaletteOverlay';
 import { QuickOpenOverlay, type QuickOpenMode } from './QuickOpenOverlay';
 import { StatusLine } from './StatusLine';
 import { filterPaletteCommands } from './palette-model';
 import { SearchOverlay } from './SearchOverlay';
 import { TreeOverlay } from './TreeOverlay';
+import { TemplateManagerOverlay } from './TemplateManagerOverlay';
 import {
   buildTree,
   clampTreeIndex,
   flattenTree,
   getParentFolderPath,
+  pruneTreeMarks,
+  toggleTreeMark,
   type TreeRow
 } from './tree-model';
+import {
+  VaultOperationDialog,
+  type VaultOperationDialogActions,
+  type VaultOperationDialogRequest
+} from './VaultOperationDialog';
 import { listCommands } from '../input';
 import {
   attachKeyListener,
@@ -32,6 +41,8 @@ import {
   SEARCH_KEYMAP,
   QUICK_OPEN_KEYMAP,
   TREE_SEARCH_KEYMAP,
+  TEMPLATES_KEYMAP,
+  VAULT_DIALOG_KEYMAP,
   VISUAL_KEYMAP,
   TREE_KEYMAP
 } from '../input';
@@ -47,6 +58,7 @@ import type {
   SearchView,
   ThemeView,
   TreeView,
+  VaultDialogView,
   VaultView
 } from '../input';
 import { buildBindingIndex, type BindingIndex } from '../input/binding-index';
@@ -72,8 +84,14 @@ import type { ZoomState } from '../surface/zoom';
 import { type CaretEngine } from '../surface/caret';
 import { VaultIndex } from '../vault';
 import { assertSafeRelativePosixPath } from '../../shared/path';
+import { rewriteTypstReferences } from '../../shared/typst-links';
 import type { SearchHit } from '../../shared/ipc/search';
-import type { NoteMeta } from '../../shared/ipc/vault';
+import {
+  parseVaultEntryName,
+  type NoteMeta,
+  type VaultDirectory,
+  type VaultTemplate
+} from '../../shared/ipc/vault';
 import type { CompileSourceFiles, OutlineEntry } from '../../shared/worker/typst';
 import type {
   FoleaPrefs,
@@ -112,7 +130,8 @@ const cloneDefaultKeymaps = (): KeymapSet => ({
   outline: new Map(OUTLINE_KEYMAP),
   links: new Map(LINKS_KEYMAP),
   quickOpen: new Map(QUICK_OPEN_KEYMAP),
-  global: new Map(GLOBAL_KEYMAP)
+  global: new Map(GLOBAL_KEYMAP),
+  templates: new Map(TEMPLATES_KEYMAP)
 });
 
 const keymapList = (keymaps: KeymapSet): readonly Keymap[] => [
@@ -126,7 +145,8 @@ const keymapList = (keymaps: KeymapSet): readonly Keymap[] => [
   keymaps.search,
   keymaps.outline,
   keymaps.links,
-  keymaps.quickOpen
+  keymaps.quickOpen,
+  keymaps.templates ?? TEMPLATES_KEYMAP
 ];
 
 const replaceKeymapContents = (target: Keymap, source: Keymap): void => {
@@ -148,12 +168,17 @@ const replaceKeymaps = (target: KeymapSet, source: KeymapSet): void => {
   replaceKeymapContents(target.links, source.links);
   replaceKeymapContents(target.quickOpen, source.quickOpen);
   replaceKeymapContents(target.global, source.global);
+  if (target.templates && source.templates) {
+    replaceKeymapContents(target.templates, source.templates);
+  }
 };
 
 export const App = () => {
   const [startupState, setStartupState] = createSignal<StartupState>('loading');
   const [version, setVersion] = createSignal('');
   const [notes, setNotes] = createSignal<NoteMeta[]>([]);
+  const [directories, setDirectories] = createSignal<VaultDirectory[]>([]);
+  const [treeMarks, setTreeMarks] = createSignal<ReadonlySet<string>>(new Set());
   const [selectedRelPath, setSelectedRelPath] = createSignal('');
   const [selectedTreeIndex, setSelectedTreeIndex] = createSignal(0);
   const [collapsedFolders, setCollapsedFolders] = createSignal<ReadonlySet<string>>(new Set());
@@ -195,6 +220,14 @@ export const App = () => {
   const [bindingIndex, setBindingIndex] = createSignal<BindingIndex>(new Map());
   const [recentVaults, setRecentVaults] = createSignal<readonly string[]>([]);
   const [treeSearchQuery, setTreeSearchQuery] = createSignal('');
+  const [lastCreationTemplate, setLastCreationTemplate] = createSignal<string | null>(null);
+  const [managedTemplates, setManagedTemplates] = createSignal<readonly VaultTemplate[]>([]);
+  const [selectedTemplateIndex, setSelectedTemplateIndex] = createSignal(0);
+  const [vaultDialogRequest, setVaultDialogRequest] = createSignal<VaultOperationDialogRequest>();
+  const [vaultDialogParentContext, setVaultDialogParentContext] = createSignal<string>();
+  const [operationNotice, setOperationNotice] = createSignal<OperationNoticeValue>();
+  const [treeContextMenuOpen, setTreeContextMenuOpen] = createSignal(false);
+  const [templateContextMenuOpen, setTemplateContextMenuOpen] = createSignal(false);
 
   const vaultIndex = new VaultIndex();
   let surfaceMount: HTMLDivElement | undefined;
@@ -214,8 +247,34 @@ export const App = () => {
   // Action refs — set inside onMount, consumed by JSX click handlers
   let paletteAcceptRow: (index: number) => void = () => {};
   let treeAcceptRow: (index: number) => void = () => {};
+  let treeContextAction: (
+    action:
+      | 'create-note'
+      | 'create-directory'
+      | 'open'
+      | 'editor'
+      | 'mark'
+      | 'move'
+      | 'rename'
+      | 'delete',
+    index?: number
+  ) => void = () => {};
+  let treeDrop: (source: string, index?: number) => void = () => {};
+  let treeCloseRequest: () => void = () => {};
+  let openTemplateManagerContext: () => void = () => {};
   let quickOpenInputHandler: (query: string) => void = () => {};
   let quickOpenAcceptRow: (index: number) => void = () => {};
+  let resolveVaultDialog: ((value: string | null | boolean | undefined) => void) | undefined;
+  let openVaultDialogContext: () => void = () => {};
+  let closeVaultDialogContext: () => void = () => {};
+  let dismissTreeContextMenu: () => void = () => {};
+  let dismissTemplateContextMenu: () => void = () => {};
+  let vaultDialogActions: VaultOperationDialogActions = {
+    cancel: () => {},
+    submit: () => {},
+    next: () => {},
+    previous: () => {}
+  };
 
   // Capture outline/links/search view refs so JSX can call accept(index)
   let outlineViewRef: OutlineView | undefined;
@@ -257,10 +316,19 @@ export const App = () => {
   const outlineVisible = createMemo(() => activeContext() === 'outline');
   const linksVisible = createMemo(() => activeContext() === 'links');
   const treeOverlayVisible = createMemo(
-    () => activeContext() === 'tree' || activeContext() === 'tree-search'
+    () =>
+      activeContext() === 'tree' ||
+      activeContext() === 'tree-search' ||
+      (activeContext() === 'vault-dialog' &&
+        (vaultDialogParentContext() === 'tree' || vaultDialogParentContext() === 'tree-search'))
+  );
+  const templateManagerVisible = createMemo(
+    () =>
+      activeContext() === 'templates' ||
+      (activeContext() === 'vault-dialog' && vaultDialogParentContext() === 'templates')
   );
   const quickOpenVisible = createMemo(() => activeContext() === 'quick-open');
-  const treeRoot = createMemo(() => buildTree(notes()));
+  const treeRoot = createMemo(() => buildTree(notes(), directories()));
   const treeRows = createMemo(() => flattenTree(treeRoot(), collapsedFolders()));
   const visibleTreeRows = createMemo(() => {
     const query = treeSearchQuery().trim().toLowerCase();
@@ -635,7 +703,8 @@ export const App = () => {
         lastOpenedNote: null,
         recentNotes: [],
         notePositions: {},
-        commandHistory: []
+        commandHistory: [],
+        lastCreationTemplate: null
       };
     }
   };
@@ -659,13 +728,23 @@ export const App = () => {
   const refreshVault = async (vsParam?: VaultStateFileV1): Promise<void> => {
     try {
       renderSourceFiles = undefined;
-      const listedNotes = vaultIndex.rebuild(await window.folea.vault.list());
+      const snapshot = await window.folea.vault.snapshot();
+      const listedNotes = vaultIndex.rebuild(snapshot.notes);
       setNotes(listedNotes);
+      setDirectories([...snapshot.directories]);
       setVaultStatus(listedNotes.length === 0 ? 'empty vault' : 'vault open');
 
       const vs = vsParam ?? (await loadVaultStateOrDefault());
       setRecentNotes(vs.recentNotes);
       setCommandHistory(vs.commandHistory);
+      const availableTemplates = await window.folea.vault.templates().catch(() => []);
+      const templateAvailable = availableTemplates.some(
+        (template) => template.relPath === vs.lastCreationTemplate
+      );
+      setLastCreationTemplate(templateAvailable ? vs.lastCreationTemplate : null);
+      if (vs.lastCreationTemplate && !templateAvailable) {
+        void window.folea.vaultState.update({ type: 'templateSelected', relPath: null });
+      }
 
       const noteSet = new Set(listedNotes.map((n) => n.relPath));
       const missingPaths = [...vs.recentNotes.map((n) => n.relPath), vs.lastOpenedNote].filter(
@@ -711,11 +790,339 @@ export const App = () => {
     } catch {
       vaultIndex.rebuild([]);
       setNotes([]);
+      setDirectories([]);
       setSelectedRelPath('');
       setCurrentSource('');
       setOutlineEntries([]);
       surface?.clear();
       setVaultStatus('no vault');
+    }
+  };
+
+  const parentDirectory = (relPath: string): string => getParentFolderPath(relPath) ?? '';
+
+  const creationDirectory = (row = selectedTreeRow()): string => {
+    if (!row) return '';
+    return row.kind === 'folder' ? row.relPath : parentDirectory(row.relPath);
+  };
+
+  const reportOperationError = (error: unknown): void => {
+    setOperationNotice({
+      tone: 'error',
+      message: error instanceof Error ? error.message : String(error)
+    });
+  };
+
+  const reportOperationWarnings = (warnings: readonly string[]): void => {
+    if (warnings.length > 0) setOperationNotice({ tone: 'warning', message: warnings.join('\n') });
+  };
+
+  const requestVaultDialog = (
+    request: VaultOperationDialogRequest
+  ): Promise<string | null | boolean | undefined> =>
+    new Promise((resolve) => {
+      resolveVaultDialog?.(undefined);
+      resolveVaultDialog = resolve;
+      setOperationNotice(undefined);
+      setVaultDialogRequest(request);
+      openVaultDialogContext();
+    });
+
+  const finishVaultDialog = (value: string | null | boolean | undefined): void => {
+    const resolve = resolveVaultDialog;
+    resolveVaultDialog = undefined;
+    setVaultDialogRequest(undefined);
+    closeVaultDialogContext();
+    resolve?.(value);
+  };
+
+  const requestText = (
+    title: string,
+    label: string,
+    value: string,
+    submitLabel: string,
+    placeholder?: string
+  ): Promise<string | undefined> =>
+    requestVaultDialog({
+      kind: 'text',
+      title,
+      label,
+      value,
+      submitLabel,
+      ...(placeholder === undefined ? {} : { placeholder })
+    }).then((result) => (typeof result === 'string' ? result : undefined));
+
+  const requestConfirmation = (
+    title: string,
+    message: string,
+    submitLabel: string,
+    destructive = false
+  ): Promise<boolean> =>
+    requestVaultDialog({ kind: 'confirm', title, message, submitLabel, destructive }).then(
+      (result) => result === true
+    );
+
+  const createNoteFlow = async (directory: string): Promise<void> => {
+    const rawName = await requestText('Create note', 'Note name', '', 'Continue', 'Note name');
+    if (rawName === undefined) return;
+    try {
+      const segment = parseVaultEntryName(rawName.trim(), 'Note name');
+      const filename = segment.endsWith('.typ') ? segment : `${segment}.typ`;
+      const templates = await window.folea.vault.templates();
+      const previous = lastCreationTemplate();
+      const selectedTemplatePath = await requestVaultDialog({
+        kind: 'template',
+        title: 'Choose template',
+        templates,
+        selectedRelPath: templates.some((template) => template.relPath === previous)
+          ? previous
+          : null,
+        submitLabel: 'Create'
+      });
+      if (selectedTemplatePath === undefined) return;
+      const template =
+        typeof selectedTemplatePath === 'string'
+          ? templates.find((candidate) => candidate.relPath === selectedTemplatePath)
+          : undefined;
+      const relPath = directory === '' ? filename : `${directory}/${filename}`;
+      const contents = template
+        ? rewriteTypstReferences(
+            template.contents,
+            template.relPath,
+            relPath,
+            new Map(),
+            new Set(['import', 'include'] as const)
+          ).source
+        : '';
+      await window.folea.vault.create({ relPath, contents });
+      const templatePath = template?.relPath ?? null;
+      const state = await window.folea.vaultState.update({
+        type: 'templateSelected',
+        relPath: templatePath
+      });
+      setLastCreationTemplate(state.lastCreationTemplate);
+      await refreshVault(state);
+      await selectNote(relPath);
+    } catch (error) {
+      reportOperationError(error);
+    }
+  };
+
+  const createDirectoryFlow = async (directoryOverride?: string): Promise<void> => {
+    const rawName = await requestText(
+      'Create directory',
+      'Directory name',
+      '',
+      'Create',
+      'Directory name'
+    );
+    if (rawName === undefined) return;
+    try {
+      const name = parseVaultEntryName(rawName.trim(), 'Directory name');
+      const directory = directoryOverride ?? creationDirectory();
+      const relPath = directory === '' ? name : `${directory}/${name}`;
+      await window.folea.vault.createDirectory({ relPath });
+      await refreshVault();
+    } catch (error) {
+      reportOperationError(error);
+    }
+  };
+
+  const renameSelectionFlow = async (): Promise<void> => {
+    const row = selectedTreeRow();
+    if (!row) return;
+    const rawName = await requestText('Rename entry', 'New name', row.name, 'Rename');
+    if (rawName === undefined) return;
+    try {
+      let name = parseVaultEntryName(rawName.trim(), 'New name');
+      if (row.kind === 'note' && !name.endsWith('.typ')) name += '.typ';
+      const parent = parentDirectory(row.relPath);
+      const to = parent === '' ? name : `${parent}/${name}`;
+      const impact = await window.folea.vault.analyzeOperation({
+        operation: 'rename',
+        sources: [row.relPath],
+        destination: to
+      });
+      const updateReferences =
+        impact.references.length === 0 ||
+        (await requestConfirmation(
+          'Update references',
+          `${impact.references.length} references are affected. Update them?`,
+          'Update'
+        ));
+      const result = await window.folea.vault.renameEntry({
+        from: row.relPath,
+        to,
+        updateReferences
+      });
+      setTreeMarks((marks) => {
+        const next = new Set(marks);
+        next.delete(row.relPath);
+        next.add(to);
+        return next;
+      });
+      await refreshVault();
+      if (row.kind === 'note' && selectedRelPath() === row.relPath) await selectNote(to);
+      reportOperationWarnings(result.warnings);
+    } catch (error) {
+      reportOperationError(error);
+    }
+  };
+
+  const moveMarksFlow = async (
+    explicitSources?: readonly string[],
+    targetRow = selectedTreeRow()
+  ): Promise<void> => {
+    const sources = explicitSources ?? [...treeMarks()];
+    if (sources.length === 0) return;
+    const destinationDirectory = targetRow
+      ? targetRow.kind === 'folder'
+        ? targetRow.relPath
+        : parentDirectory(targetRow.relPath)
+      : '';
+    try {
+      const impact = await window.folea.vault.analyzeOperation({
+        operation: 'move',
+        sources,
+        destination: destinationDirectory
+      });
+      const updateReferences =
+        impact.references.length === 0 ||
+        (await requestConfirmation(
+          'Update references',
+          `${impact.references.length} references are affected. Update them?`,
+          'Update'
+        ));
+      const result = await window.folea.vault.moveBatch({
+        sources,
+        destinationDirectory,
+        updateReferences
+      });
+      setTreeMarks(new Set<string>());
+      await refreshVault();
+      const currentMapping = result.mappings.find(
+        (mapping) =>
+          selectedRelPath() === mapping.from || selectedRelPath().startsWith(`${mapping.from}/`)
+      );
+      if (currentMapping) {
+        const mapped = `${currentMapping.to}${selectedRelPath().slice(currentMapping.from.length)}`;
+        if (mapped.endsWith('.typ')) await selectNote(mapped);
+      }
+      reportOperationWarnings(result.warnings);
+    } catch (error) {
+      reportOperationError(error);
+    }
+  };
+
+  const deleteSelectionFlow = async (explicitSources?: readonly string[]): Promise<void> => {
+    const row = selectedTreeRow();
+    const sources =
+      explicitSources ?? (treeMarks().size > 0 ? [...treeMarks()] : row ? [row.relPath] : []);
+    if (sources.length === 0) return;
+    try {
+      const impact = await window.folea.vault.analyzeOperation({ operation: 'trash', sources });
+      const summary = `${impact.counts.notes} notes, ${impact.counts.directories} directories, ${impact.counts.otherFiles} other files`;
+      if (
+        !(await requestConfirmation(
+          'Move to trash',
+          `Move ${summary} to the system trash?`,
+          'Move to trash',
+          true
+        ))
+      )
+        return;
+      const removeReferences =
+        impact.references.length > 0 &&
+        (await requestConfirmation(
+          'Remove references',
+          `Remove ${impact.references.length} external references too?`,
+          'Remove references',
+          true
+        ));
+      const result = await window.folea.vault.trashBatch({ sources, removeReferences });
+      const succeeded = new Set(
+        result.results.filter((item) => item.success).map((item) => item.source)
+      );
+      setTreeMarks((marks) => new Set([...marks].filter((mark) => !succeeded.has(mark))));
+      await refreshVault();
+      const failures = result.results.filter((item) => !item.success);
+      const messages = [
+        ...failures.map((item) => `${item.source}: ${item.error ?? 'unable to trash'}`),
+        ...result.warnings
+      ];
+      reportOperationWarnings(messages);
+    } catch (error) {
+      reportOperationError(error);
+    }
+  };
+
+  const manageTemplatesFlow = async (): Promise<void> => {
+    try {
+      setManagedTemplates(await window.folea.vault.templates());
+      setSelectedTemplateIndex(0);
+      openTemplateManagerContext();
+    } catch (error) {
+      reportOperationError(error);
+    }
+  };
+
+  const openManagedTemplate = async (index = selectedTemplateIndex()): Promise<void> => {
+    const template = managedTemplates()[index];
+    if (template) await window.folea.editor.open(template.relPath).catch(reportOperationError);
+  };
+
+  const renameManagedTemplate = async (index = selectedTemplateIndex()): Promise<void> => {
+    const template = managedTemplates()[index];
+    if (!template) return;
+    const rawName = await requestText(
+      'Rename template',
+      'New template name',
+      template.name,
+      'Rename'
+    );
+    if (rawName === undefined) return;
+    try {
+      const name = parseVaultEntryName(rawName.trim(), 'Template name');
+      const to = `_templates/${name.endsWith('.typ') ? name : `${name}.typ`}`;
+      await window.folea.vault.renameEntry({
+        from: template.relPath,
+        to,
+        updateReferences: false,
+        templateMode: true
+      });
+      setManagedTemplates(await window.folea.vault.templates());
+      setLastCreationTemplate((current) => (current === template.relPath ? to : current));
+    } catch (error) {
+      reportOperationError(error);
+    }
+  };
+
+  const deleteManagedTemplate = async (index = selectedTemplateIndex()): Promise<void> => {
+    const template = managedTemplates()[index];
+    if (!template) return;
+    if (
+      !(await requestConfirmation(
+        'Move template to trash',
+        `Move template ${template.name} to the system trash?`,
+        'Move to trash',
+        true
+      ))
+    )
+      return;
+    try {
+      const result = await window.folea.vault.trashBatch({
+        sources: [template.relPath],
+        templateMode: true
+      });
+      const failed = result.results.find((item) => !item.success);
+      if (failed) throw new Error(failed.error ?? 'Unable to trash template');
+      setManagedTemplates(await window.folea.vault.templates());
+      setSelectedTemplateIndex((current) =>
+        Math.min(current, Math.max(0, managedTemplates().length - 1))
+      );
+      if (lastCreationTemplate() === template.relPath) setLastCreationTemplate(null);
+    } catch (error) {
+      reportOperationError(error);
     }
   };
 
@@ -844,6 +1251,15 @@ export const App = () => {
       setActiveContext(contextStack.active()?.name ?? 'document');
     };
 
+    openVaultDialogContext = () => {
+      setVaultDialogParentContext(contextStack.active()?.name);
+      pushContext('vault-dialog', VAULT_DIALOG_KEYMAP);
+    };
+    closeVaultDialogContext = () => {
+      popContext('vault-dialog');
+      setVaultDialogParentContext(undefined);
+    };
+
     const keymaps = cloneDefaultKeymaps();
 
     const loadKeyConfig = async (): Promise<void> => {
@@ -864,7 +1280,7 @@ export const App = () => {
     };
 
     contextStack.push({ name: 'document', keymap: keymaps.document });
-    setActiveContext('normal');
+    setActiveContext('document');
     setBindingIndex(buildBindingIndex(keymapList(keymaps)));
     void loadKeyConfig();
 
@@ -941,6 +1357,10 @@ export const App = () => {
       moveDown: () => setSelectedTreeIndex((index) => clampTreeIndex(index + 1, visibleTreeRows())),
       moveUp: () => setSelectedTreeIndex((index) => clampTreeIndex(index - 1, visibleTreeRows())),
       close: () => {
+        if (treeContextMenuOpen()) {
+          dismissTreeContextMenu();
+          return;
+        }
         setTreeSearchQuery('');
         popContext('tree-search');
         popContext('tree');
@@ -951,6 +1371,10 @@ export const App = () => {
         pushContext('tree-search', keymaps.treeSearch);
       },
       closeSearch: () => {
+        if (treeContextMenuOpen()) {
+          dismissTreeContextMenu();
+          return;
+        }
         setTreeSearchQuery('');
         setSelectedTreeIndex(0);
         popContext('tree-search');
@@ -1015,6 +1439,7 @@ export const App = () => {
         if (startupState() !== 'vault-open') return;
         const active = contextStack.active()?.name;
         if (active === 'tree' || active === 'tree-search') {
+          if (treeContextMenuOpen()) dismissTreeContextMenu();
           setTreeSearchQuery('');
           popContext('tree-search');
           popContext('tree');
@@ -1023,7 +1448,37 @@ export const App = () => {
         }
       },
       selectFirst: () => setSelectedTreeIndex(0),
-      selectLast: () => setSelectedTreeIndex(Math.max(0, visibleTreeRows().length - 1))
+      selectLast: () => setSelectedTreeIndex(Math.max(0, visibleTreeRows().length - 1)),
+      createNote: () => void createNoteFlow(creationDirectory()),
+      createNoteAtCurrent: () => {
+        if (startupState() === 'vault-open')
+          void createNoteFlow(parentDirectory(selectedRelPath()));
+      },
+      createDirectory: () => void createDirectoryFlow(),
+      renameSelection: () => void renameSelectionFlow(),
+      toggleMark: () => {
+        const row = selectedTreeRow();
+        if (row) setTreeMarks((marks) => toggleTreeMark(marks, row.relPath));
+      },
+      clearMarks: () => setTreeMarks(new Set()),
+      moveMarks: () => void moveMarksFlow(),
+      deleteSelection: () => void deleteSelectionFlow(),
+      manageTemplates: () => void manageTemplatesFlow(),
+      closeTemplates: () => {
+        if (templateContextMenuOpen()) {
+          dismissTemplateContextMenu();
+          return;
+        }
+        popContext('templates');
+      },
+      nextTemplate: () =>
+        setSelectedTemplateIndex((index) =>
+          Math.min(index + 1, Math.max(0, managedTemplates().length - 1))
+        ),
+      previousTemplate: () => setSelectedTemplateIndex((index) => Math.max(0, index - 1)),
+      openTemplate: () => void openManagedTemplate(),
+      renameTemplate: () => void renameManagedTemplate(),
+      deleteTemplate: () => void deleteManagedTemplate()
     };
 
     const paletteView: PaletteView = {
@@ -1368,6 +1823,14 @@ export const App = () => {
       }
     };
 
+    const vaultDialogView: VaultDialogView = {
+      cancel: () => vaultDialogActions.cancel(),
+      submit: () => vaultDialogActions.submit(),
+      next: () => vaultDialogActions.next(),
+      previous: () => vaultDialogActions.previous(),
+      ignore: () => {}
+    };
+
     const commandContext: CommandContext = {
       document: documentView,
       contexts: contextStack,
@@ -1381,7 +1844,8 @@ export const App = () => {
       search: searchView,
       quickOpen: quickOpenView,
       tree: treeView,
-      vault: vaultView
+      vault: vaultView,
+      vaultDialog: vaultDialogView
     };
 
     // Wire action refs so JSX click handlers can call into onMount-scoped views
@@ -1393,16 +1857,55 @@ export const App = () => {
     treeAcceptRow = (index: number) => {
       const row = visibleTreeRows()[index];
       if (!row) return;
+      setSelectedTreeIndex(index);
 
       if (row.kind === 'folder') {
         toggleFolder(row.relPath);
         return;
       }
 
-      setTreeSearchQuery('');
-      popContext('tree-search');
-      popContext('tree');
       void selectNote(row.relPath);
+    };
+    treeCloseRequest = () => treeView.close();
+    openTemplateManagerContext = () =>
+      pushContext('templates', keymaps.templates ?? TEMPLATES_KEYMAP);
+    treeDrop = (source, index) => {
+      const target = index === undefined ? undefined : visibleTreeRows()[index];
+      const sources = treeMarks().has(source) ? [...treeMarks()] : [source];
+      void moveMarksFlow(sources, target);
+    };
+    treeContextAction = (action, index) => {
+      const row = index === undefined ? undefined : visibleTreeRows()[index];
+      if (index !== undefined) setSelectedTreeIndex(index);
+      if (action === 'create-note') void createNoteFlow(row ? creationDirectory(row) : '');
+      else if (action === 'create-directory')
+        void createDirectoryFlow(row ? creationDirectory(row) : '');
+      else if (action === 'open' && row?.kind === 'note') void selectNote(row.relPath);
+      else if (action === 'open' && row?.kind === 'folder') toggleFolder(row.relPath);
+      else if (action === 'editor' && row?.kind === 'note')
+        void window.folea.editor.open(row.relPath);
+      else if (action === 'mark' && row)
+        setTreeMarks((marks) => toggleTreeMark(marks, row.relPath));
+      else if (action === 'move' && row) {
+        void requestText(
+          'Move entry',
+          'Destination directory',
+          '',
+          'Move',
+          'Leave empty for vault root'
+        ).then((destination) => {
+          if (destination === undefined) return;
+          void window.folea.vault
+            .moveBatch({
+              sources: [row.relPath],
+              destinationDirectory: destination.trim(),
+              updateReferences: true
+            })
+            .then(() => refreshVault())
+            .catch(reportOperationError);
+        });
+      } else if (action === 'rename') setTimeout(() => void renameSelectionFlow());
+      else if (action === 'delete' && row) void deleteSelectionFlow([row.relPath]);
     };
     quickOpenInputHandler = (query: string) => quickOpenView.setQuery(query);
     quickOpenAcceptRow = (index: number) => quickOpenView.accept(index);
@@ -1426,6 +1929,14 @@ export const App = () => {
 
     const unsubscribeVault = window.folea.vault.onChanged((event) => {
       renderSourceFiles = undefined;
+      if (event.kind === 'structural') {
+        void window.folea.vault.snapshot().then((snapshot) => {
+          setNotes(vaultIndex.rebuild(snapshot.notes));
+          setDirectories([...snapshot.directories]);
+          void rebuildLinkGraph();
+        });
+        return;
+      }
       if (event.kind === 'deleted') {
         surface?.invalidate(event.relPath);
       }
@@ -1571,6 +2082,7 @@ export const App = () => {
 
   createEffect(() => {
     setSelectedTreeIndex((index) => clampTreeIndex(index, treeRows()));
+    setTreeMarks((marks) => pruneTreeMarks(marks, treeRows()));
   });
 
   createEffect(() => {
@@ -1728,6 +2240,39 @@ export const App = () => {
           searchQuery={treeSearchQuery()}
           searchActive={activeContext() === 'tree-search'}
           onRowClick={(index) => treeAcceptRow(index)}
+          marks={treeMarks()}
+          onCloseRequest={() => treeCloseRequest()}
+          onContextMenuVisibilityChange={setTreeContextMenuOpen}
+          registerContextMenuDismiss={(dismiss) => {
+            dismissTreeContextMenu = dismiss;
+          }}
+          onAction={(action, index) => treeContextAction(action, index)}
+          onDrop={(source, index) => treeDrop(source, index)}
+        />
+        <TemplateManagerOverlay
+          visible={templateManagerVisible()}
+          templates={managedTemplates()}
+          selectedIndex={selectedTemplateIndex()}
+          onSelect={setSelectedTemplateIndex}
+          onOpen={(index) => void openManagedTemplate(index)}
+          onRename={(index) => void renameManagedTemplate(index)}
+          onDelete={(index) => void deleteManagedTemplate(index)}
+          onContextMenuVisibilityChange={setTemplateContextMenuOpen}
+          registerContextMenuDismiss={(dismiss) => {
+            dismissTemplateContextMenu = dismiss;
+          }}
+        />
+        <VaultOperationDialog
+          request={vaultDialogRequest()}
+          onCancel={() => finishVaultDialog(undefined)}
+          onSubmit={(value) => finishVaultDialog(value)}
+          registerActions={(actions) => {
+            vaultDialogActions = actions;
+          }}
+        />
+        <OperationNotice
+          notice={operationNotice()}
+          onDismiss={() => setOperationNotice(undefined)}
         />
         <PaletteOverlay
           visible={paletteVisible()}

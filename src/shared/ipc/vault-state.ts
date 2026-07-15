@@ -1,5 +1,10 @@
 import type { RenderArtifact, TextLayerModel, OutlineEntry } from '../worker/typst';
-import { parseVaultPath, type VaultPath } from './vault';
+import {
+  parseVaultEntryPath,
+  parseVaultPath,
+  type VaultPath,
+  type VaultPathMapping
+} from './vault';
 
 export const VAULT_STATE_LOAD_CHANNEL = 'folea:vaultState:load' as const;
 export const VAULT_STATE_UPDATE_CHANNEL = 'folea:vaultState:update' as const;
@@ -41,6 +46,7 @@ export interface VaultStateFileV1 {
   readonly recentNotes: readonly RecentNoteEntry[];
   readonly notePositions: Record<VaultPath, NotePositionState>;
   readonly commandHistory: readonly string[];
+  readonly lastCreationTemplate: VaultPath | null;
 }
 
 export type VaultStatePatch =
@@ -52,7 +58,10 @@ export type VaultStatePatch =
     }
   | { readonly type: 'positionChanged'; readonly position: NotePositionState }
   | { readonly type: 'commandExecuted'; readonly commandId: string }
-  | { readonly type: 'removeMissingNotes'; readonly relPaths: readonly VaultPath[] };
+  | { readonly type: 'removeMissingNotes'; readonly relPaths: readonly VaultPath[] }
+  | { readonly type: 'pathsMoved'; readonly mappings: readonly VaultPathMapping[] }
+  | { readonly type: 'pathsRemoved'; readonly relPaths: readonly VaultPath[] }
+  | { readonly type: 'templateSelected'; readonly relPath: VaultPath | null };
 
 export const RECENT_NOTES_MAX = 50;
 export const NOTE_POSITIONS_MAX = 1000;
@@ -253,13 +262,24 @@ export const parseVaultStateFileV1 = (value: unknown): VaultStateFileV1 => {
     }
   }
 
+  let lastCreationTemplate: VaultPath | null = null;
+  if (typeof value.lastCreationTemplate === 'string') {
+    try {
+      const parsed = parseVaultEntryPath(value.lastCreationTemplate, { allowTemplates: true });
+      if (/^_templates\/[^/]+\.typ$/.test(parsed)) lastCreationTemplate = parsed;
+    } catch {
+      lastCreationTemplate = null;
+    }
+  }
+
   return {
     schemaVersion: 1,
     updatedAt: parseIsoTimestamp(value.updatedAt ?? new Date().toISOString(), 'updatedAt'),
     lastOpenedNote,
     recentNotes,
     notePositions,
-    commandHistory: parseCommandHistory(value.commandHistory)
+    commandHistory: parseCommandHistory(value.commandHistory),
+    lastCreationTemplate
   };
 };
 
@@ -269,7 +289,8 @@ export const defaultVaultState = (): VaultStateFileV1 => ({
   lastOpenedNote: null,
   recentNotes: [],
   notePositions: {},
-  commandHistory: []
+  commandHistory: [],
+  lastCreationTemplate: null
 });
 
 const parseCommandHistory = (value: unknown): readonly string[] => {
@@ -338,6 +359,41 @@ export const parseVaultStatePatch = (value: unknown): VaultStatePatch => {
         type: 'removeMissingNotes',
         relPaths: (value.relPaths as unknown[]).map((rp) => parseVaultPath(rp))
       };
+    }
+
+    case 'pathsMoved': {
+      if (!Array.isArray(value.mappings) || value.mappings.length === 0) {
+        throw new TypeError('Malformed pathsMoved patch');
+      }
+      return {
+        type: 'pathsMoved',
+        mappings: value.mappings.map((mapping) => {
+          if (!isRecord(mapping) || !hasOnlyKeys(mapping, ['from', 'to'])) {
+            throw new TypeError('Malformed path mapping');
+          }
+          return {
+            from: parseVaultEntryPath(mapping.from, { allowTemplates: true }),
+            to: parseVaultEntryPath(mapping.to, { allowTemplates: true })
+          };
+        })
+      };
+    }
+
+    case 'pathsRemoved': {
+      if (!Array.isArray(value.relPaths)) throw new TypeError('Malformed pathsRemoved patch');
+      return {
+        type: 'pathsRemoved',
+        relPaths: value.relPaths.map((path) => parseVaultEntryPath(path, { allowTemplates: true }))
+      };
+    }
+
+    case 'templateSelected': {
+      if (value.relPath === null) return { type: 'templateSelected', relPath: null };
+      const relPath = parseVaultEntryPath(value.relPath, { allowTemplates: true });
+      if (!/^_templates\/[^/]+\.typ$/.test(relPath)) {
+        throw new TypeError('Template selection must target a direct template');
+      }
+      return { type: 'templateSelected', relPath };
     }
 
     default:

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildTree, calculateVirtualWindow, flattenTree } from '../../src/renderer/app/tree-model';
+import {
+  buildTree,
+  calculateVirtualWindow,
+  flattenTree,
+  pruneTreeMarks,
+  toggleTreeMark
+} from '../../src/renderer/app/tree-model';
 import type { NoteMeta } from '../../src/shared/ipc/vault';
 
 const note = (relPath: string): NoteMeta => {
@@ -64,11 +70,36 @@ describe('tree model', () => {
     ).toEqual(['folder:projects', 'note:root.typ']);
   });
 
+  it('keeps empty directories from the vault snapshot', () => {
+    const tree = buildTree(
+      [],
+      [
+        { relPath: 'empty', name: 'empty' },
+        { relPath: 'parent/child', name: 'child' },
+        { relPath: 'parent', name: 'parent' }
+      ]
+    );
+    expect(flattenTree(tree, new Set()).map((row) => row.relPath)).toEqual([
+      'empty',
+      'parent',
+      'parent/child'
+    ]);
+  });
+
   it('bounds the virtual row window independent of total row count', () => {
     const window = calculateVirtualWindow(10_000, 5_000, 280, 28, 6);
 
     expect(window.start).toBeGreaterThan(0);
     expect(window.end - window.start).toBeLessThanOrEqual(22);
     expect(window.totalHeight).toBe(280_000);
+  });
+
+  it('toggles and prunes persistent marks', () => {
+    const marks = toggleTreeMark(new Set(), 'a.typ');
+    expect([...marks]).toEqual(['a.typ']);
+    expect([...toggleTreeMark(marks, 'a.typ')]).toEqual([]);
+    expect([...pruneTreeMarks(new Set(['a.typ', 'missing.typ']), [{ relPath: 'a.typ' }])]).toEqual([
+      'a.typ'
+    ]);
   });
 });
