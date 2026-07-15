@@ -88,7 +88,7 @@
     "@myriaddreamin/typst-ts-web-compiler": "0.7.0",
     "@vscode/ripgrep": "^1.18.0",
     "chokidar": "^5.0.0",
-    "solid-js": "^1.9.13"
+    "solid-js": "^1.9.14"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
