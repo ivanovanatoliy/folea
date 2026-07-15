@@ -22,9 +22,17 @@ export type {
   VaultDialogView,
   CommandContext,
   Command,
+  CommandExposure,
   DispatchResult
 } from './commands';
-export { registerCommand, getCommand, hasCommand, listCommands } from './commands';
+export {
+  registerCommand,
+  getCommand,
+  hasCommand,
+  listCommands,
+  listPaletteCommands,
+  listRemappableCommands
+} from './commands';
 
 export { createSequenceBuffer, SEQUENCE_TIMEOUT_MS } from './sequence';
 

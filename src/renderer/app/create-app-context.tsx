@@ -25,7 +25,7 @@ import {
   type VaultOperationDialogActions,
   type VaultOperationDialogRequest
 } from './VaultOperationDialog';
-import { listCommands } from '../input';
+import { listPaletteCommands, listRemappableCommands } from '../input';
 import {
   attachKeyListener,
   type CaretView,
@@ -339,7 +339,7 @@ export const AppRuntime = () => {
     () => visibleTreeRows()[clampTreeIndex(selectedTreeIndex(), visibleTreeRows())]
   );
   const paletteMatches = createMemo(() =>
-    filterPaletteCommands(listCommands(), paletteQuery(), commandHistory())
+    filterPaletteCommands(listPaletteCommands(), paletteQuery(), commandHistory())
   );
 
   const noteController = createNoteController({
@@ -834,7 +834,7 @@ export const AppRuntime = () => {
     const loadKeyConfig = async (): Promise<void> => {
       try {
         const response = await window.folea.keysConfig.load();
-        const knownCommands = new Set(listCommands().map((command) => command.id));
+        const knownCommands = new Set(listRemappableCommands().map((command) => command.id));
         const parsed = parseKeysConfig(response.content, knownCommands);
         const applied = applyKeysConfigOverrides(cloneDefaultKeymaps(), {
           overrides: parsed.overrides,

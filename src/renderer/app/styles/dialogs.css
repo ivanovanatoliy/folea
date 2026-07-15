@@ -56,7 +56,6 @@
 }
 
 .vault-dialog-field input:focus {
-  border-color: var(--folea-accent);
   outline: none;
 }
 

@@ -2,21 +2,34 @@ import { registerCommand } from '../commands';
 
 registerCommand({
   id: 'zoom.fitWidth',
+  exposure: 'action',
   title: 'Fit document width',
   run: (ctx) => ctx.zoom.fitWidth()
 });
 registerCommand({
   id: 'zoom.fitContentWidth',
+  exposure: 'action',
   title: 'Fit content width',
   run: (ctx) => ctx.zoom.fitContentWidth()
 });
 registerCommand({
   id: 'zoom.fitPage',
+  exposure: 'action',
   title: 'Fit one page height',
   run: (ctx) => ctx.zoom.fitPage()
 });
-registerCommand({ id: 'zoom.in', title: 'Zoom in 10%', run: (ctx) => ctx.zoom.zoomIn() });
-registerCommand({ id: 'zoom.out', title: 'Zoom out 10%', run: (ctx) => ctx.zoom.zoomOut() });
+registerCommand({
+  id: 'zoom.in',
+  exposure: 'action',
+  title: 'Zoom in 10%',
+  run: (ctx) => ctx.zoom.zoomIn()
+});
+registerCommand({
+  id: 'zoom.out',
+  exposure: 'action',
+  title: 'Zoom out 10%',
+  run: (ctx) => ctx.zoom.zoomOut()
+});
 
 registerCommand({
   id: 'document.scrollLineDown',
@@ -70,6 +83,7 @@ registerCommand({
 });
 registerCommand({
   id: 'view.toggleTree',
+  exposure: 'action',
   title: 'Toggle tree',
   run: (ctx) => ctx.tree.toggleOverlay()
 });

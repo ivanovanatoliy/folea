@@ -162,17 +162,24 @@ export interface CommandContext {
   readonly vaultDialog?: VaultDialogView;
 }
 
-export type Command = {
-  id: string;
-  title?: string;
+export type CommandExposure = 'action' | 'navigation' | 'internal';
+
+export interface Command {
+  readonly id: string;
+  readonly title?: string;
+  readonly exposure: CommandExposure;
   run(ctx: CommandContext, arg?: string): boolean | void;
+}
+
+type CommandRegistration = Omit<Command, 'exposure'> & {
+  readonly exposure?: CommandExposure;
 };
 export type DispatchResult = 'handled' | 'pending' | 'unhandled';
 
 const registry = new Map<string, Command>();
 
-export const registerCommand = (command: Command): void => {
-  registry.set(command.id, command);
+export const registerCommand = (command: CommandRegistration): void => {
+  registry.set(command.id, { ...command, exposure: command.exposure ?? 'navigation' });
 };
 
 export const getCommand = (id: string): Command | undefined => registry.get(id);
@@ -181,3 +188,9 @@ export const hasCommand = (id: string): boolean => registry.has(id);
 
 export const listCommands = (): readonly Command[] =>
   [...registry.values()].sort((left, right) => left.id.localeCompare(right.id));
+
+export const listPaletteCommands = (): readonly Command[] =>
+  listCommands().filter((command) => command.exposure === 'action');
+
+export const listRemappableCommands = (): readonly Command[] =>
+  listCommands().filter((command) => command.exposure !== 'internal');

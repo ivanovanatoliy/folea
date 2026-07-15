@@ -2,6 +2,7 @@ import { registerCommand } from '../commands';
 
 registerCommand({
   id: 'palette.open',
+  exposure: 'action',
   title: 'Open command palette',
   run: (ctx) => ctx.palette.open()
 });
@@ -21,9 +22,15 @@ registerCommand({
   title: 'Run selected palette command',
   run: (ctx) => ctx.palette.accept()
 });
-registerCommand({ id: 'search.open', title: 'Open search', run: (ctx) => ctx.search.open() });
+registerCommand({
+  id: 'search.open',
+  exposure: 'action',
+  title: 'Open search',
+  run: (ctx) => ctx.search.open()
+});
 registerCommand({
   id: 'search.openGlobal',
+  exposure: 'action',
   title: 'Open vault search',
   run: (ctx) => ctx.search.openGlobal()
 });
@@ -45,6 +52,7 @@ registerCommand({
 });
 registerCommand({
   id: 'document.outline',
+  exposure: 'action',
   title: 'Open outline',
   run: (ctx) => ctx.outline.open()
 });
@@ -66,6 +74,7 @@ registerCommand({
 });
 registerCommand({
   id: 'document.links',
+  exposure: 'action',
   title: 'Open links panel',
   run: (ctx) => ctx.links.open()
 });

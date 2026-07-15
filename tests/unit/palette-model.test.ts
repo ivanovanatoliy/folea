@@ -4,9 +4,14 @@ import { filterPaletteCommands } from '../../src/renderer/app/palette-model';
 import type { Command } from '../../src/renderer/input';
 
 const commands: readonly Command[] = [
-  { id: 'document.scrollLineDown', title: 'Scroll down', run: () => undefined },
-  { id: 'document.outline', title: 'Open outline', run: () => undefined },
-  { id: 'search.open', title: 'Open search', run: () => undefined }
+  {
+    id: 'document.scrollLineDown',
+    title: 'Scroll down',
+    exposure: 'action',
+    run: () => undefined
+  },
+  { id: 'document.outline', title: 'Open outline', exposure: 'action', run: () => undefined },
+  { id: 'search.open', title: 'Open search', exposure: 'action', run: () => undefined }
 ];
 
 describe('palette command filtering', () => {

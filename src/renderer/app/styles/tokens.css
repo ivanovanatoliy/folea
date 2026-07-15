@@ -75,7 +75,7 @@ body {
   overflow: hidden;
 }
 
+:focus,
 :focus-visible {
-  outline: 2px solid var(--folea-accent-bright) !important;
-  outline-offset: 2px;
+  outline: none;
 }

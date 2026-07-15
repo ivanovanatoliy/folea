@@ -2,6 +2,7 @@ import { registerCommand } from '../commands';
 
 registerCommand({
   id: 'caret.toggle',
+  exposure: 'action',
   title: 'Toggle caret mode',
   run: (ctx) => ctx.caret.toggle()
 });
@@ -52,32 +53,6 @@ registerCommand({
   run: (ctx) => ctx.caret.enterVisual()
 });
 registerCommand({
-  id: 'caret.exitVisual',
-  title: 'Exit visual mode',
-  run: (ctx) => ctx.caret.exitVisual()
-});
-registerCommand({
-  id: 'caret.extendDown',
-  title: 'Extend selection down',
-  run: (ctx) => ctx.caret.extendDown()
-});
-registerCommand({
-  id: 'caret.extendUp',
-  title: 'Extend selection up',
-  run: (ctx) => ctx.caret.extendUp()
-});
-registerCommand({
-  id: 'caret.extendLeft',
-  title: 'Extend selection left',
-  run: (ctx) => ctx.caret.extendLeft()
-});
-registerCommand({
-  id: 'caret.extendRight',
-  title: 'Extend selection right',
-  run: (ctx) => ctx.caret.extendRight()
-});
-registerCommand({ id: 'caret.yank', title: 'Yank rendered text', run: (ctx) => ctx.caret.yank() });
-registerCommand({
   id: 'caret.nextMatch',
   title: 'Next search match',
   run: (ctx) => ctx.caret.nextMatch()
@@ -89,6 +64,7 @@ registerCommand({
 });
 registerCommand({
   id: 'caret.smartJump',
+  exposure: 'action',
   title: 'Jump to link under caret',
   run: (ctx) => ctx.caret.smartJump()
 });

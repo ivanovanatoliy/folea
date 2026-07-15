@@ -21,6 +21,7 @@ registerCommand({
 });
 registerCommand({
   id: 'tree.searchAppend',
+  exposure: 'internal',
   title: 'Append tree search character',
   run: (ctx, char) => {
     if (char) ctx.tree.appendSearchChar(char);
@@ -43,21 +44,25 @@ registerCommand({
 });
 registerCommand({
   id: 'tree.createNote',
+  exposure: 'action',
   title: 'Create note',
   run: (ctx) => ctx.tree.createNote?.()
 });
 registerCommand({
   id: 'tree.createNoteAtCurrent',
+  exposure: 'action',
   title: 'Create note beside current note',
   run: (ctx) => ctx.tree.createNoteAtCurrent?.()
 });
 registerCommand({
   id: 'tree.createDirectory',
+  exposure: 'action',
   title: 'Create directory',
   run: (ctx) => ctx.tree.createDirectory?.()
 });
 registerCommand({
   id: 'tree.rename',
+  exposure: 'action',
   title: 'Rename note or directory',
   run: (ctx) => ctx.tree.renameSelection?.()
 });
@@ -73,16 +78,19 @@ registerCommand({
 });
 registerCommand({
   id: 'tree.moveMarks',
+  exposure: 'action',
   title: 'Move marked entries',
   run: (ctx) => ctx.tree.moveMarks?.()
 });
 registerCommand({
   id: 'tree.delete',
+  exposure: 'action',
   title: 'Move entries to trash',
   run: (ctx) => ctx.tree.deleteSelection?.()
 });
 registerCommand({
   id: 'templates.manage',
+  exposure: 'action',
   title: 'Manage note templates',
   run: (ctx) => ctx.tree.manageTemplates?.()
 });
@@ -116,8 +124,28 @@ registerCommand({
   title: 'Move selected template to trash',
   run: (ctx) => ctx.tree.deleteTemplate?.()
 });
-registerCommand({ id: 'vaultDialog.cancel', run: (ctx) => ctx.vaultDialog?.cancel() });
-registerCommand({ id: 'vaultDialog.submit', run: (ctx) => ctx.vaultDialog?.submit() });
-registerCommand({ id: 'vaultDialog.next', run: (ctx) => ctx.vaultDialog?.next() });
-registerCommand({ id: 'vaultDialog.previous', run: (ctx) => ctx.vaultDialog?.previous() });
-registerCommand({ id: 'vaultDialog.ignore', run: (ctx) => ctx.vaultDialog?.ignore() });
+registerCommand({
+  id: 'vaultDialog.cancel',
+  exposure: 'internal',
+  run: (ctx) => ctx.vaultDialog?.cancel()
+});
+registerCommand({
+  id: 'vaultDialog.submit',
+  exposure: 'internal',
+  run: (ctx) => ctx.vaultDialog?.submit()
+});
+registerCommand({
+  id: 'vaultDialog.next',
+  exposure: 'internal',
+  run: (ctx) => ctx.vaultDialog?.next()
+});
+registerCommand({
+  id: 'vaultDialog.previous',
+  exposure: 'internal',
+  run: (ctx) => ctx.vaultDialog?.previous()
+});
+registerCommand({
+  id: 'vaultDialog.ignore',
+  exposure: 'internal',
+  run: (ctx) => ctx.vaultDialog?.ignore()
+});
