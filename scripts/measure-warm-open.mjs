@@ -2,6 +2,7 @@ import { _electron as electron } from 'playwright';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { median, writePerformanceResult } from './performance-output.mjs';
 
 const runs = Number.parseInt(process.env.FOLEA_WARM_OPEN_RUNS ?? '7', 10);
 const configuredVaultRoot = process.env.FOLEA_WARM_OPEN_VAULT_PATH;
@@ -54,11 +55,6 @@ const waitForSurfacePrefetched = (page, noteId) =>
 
 const waitOrTimeout = (promise, ms) =>
   Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve('timeout'), ms))]);
-
-const median = (values) => {
-  const sorted = [...values].sort((left, right) => left - right);
-  return sorted[Math.floor(sorted.length / 2)];
-};
 
 const openTree = async (page) => {
   const mode = await page.getByTestId('statusline-mode').textContent();
@@ -171,8 +167,16 @@ try {
   console.log(`vault: ${vaultRoot}`);
   console.log(`primary note: ${primaryNote}`);
   console.log(`secondary note: ${secondaryNote}`);
+  const warmMedianMs = Math.round(median(warmOpenMs));
   console.log(`cold compile: ${Math.round(coldCompileMs)} ms`);
-  console.log(`warm note-open cached median (${runs} runs): ${Math.round(median(warmOpenMs))} ms`);
+  console.log(`warm note-open cached median (${runs} runs): ${warmMedianMs} ms`);
+  await writePerformanceResult('warm-note-open', {
+    noteCount: 2,
+    runs,
+    coldCompileMs: Math.round(coldCompileMs),
+    warmMedianMs,
+    samplesMs: warmOpenMs
+  });
 } finally {
   await electronApp?.close();
   if (ownsVaultRoot) {

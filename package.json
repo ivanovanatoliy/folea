@@ -10,6 +10,10 @@
     "name": "folea contributors",
     "email": "maintainers@folea.dev"
   },
+  "engines": {
+    "node": ">=22.0.0 <25"
+  },
+  "packageManager": "npm@11.12.1",
   "build": {
     "appId": "dev.folea.app",
     "productName": "folea",
@@ -60,9 +64,11 @@
     "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
     "typecheck:parity": "node node_modules/typescript/bin/tsc -p tsconfig.node.json --noEmit && node node_modules/typescript/bin/tsc -p tsconfig.web.json --noEmit",
     "lint": "eslint \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\" \"*.config.ts\"",
+    "lint:type-aware": "eslint --config eslint.typed.config.mjs \"src/**/*.{ts,tsx}\"",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:unit:changed": "vitest run --changed",
     "test:unit:related": "vitest related --run",
     "test:e2e": "npm run build && playwright test",
@@ -70,8 +76,12 @@
     "rebuild": "electron-rebuild",
     "measure:cold-start": "npm run build && node scripts/measure-cold-start.mjs",
     "measure:warm-open": "npm run build && node scripts/measure-warm-open.mjs",
-    "measure:input-to-paint": "npm run build && node scripts/measure-input-to-paint.mjs",
-    "measure:graph-build": "npm run build && node scripts/measure-graph-build.mjs"
+    "measure:input-next-frame": "npm run build && node scripts/measure-input-to-paint.mjs",
+    "measure:input-to-paint": "npm run measure:input-next-frame",
+    "measure:graph-delta": "npm run build && node scripts/measure-graph-build.mjs",
+    "measure:graph-build": "npm run measure:graph-delta",
+    "measure:baselines": "npm run build && node scripts/measure-cold-start.mjs && node scripts/measure-warm-open.mjs && node scripts/measure-input-to-paint.mjs && node scripts/measure-graph-build.mjs",
+    "measure:check": "node scripts/check-performance-results.mjs"
   },
   "dependencies": {
     "@myriaddreamin/typst-ts-renderer": "0.7.0",
@@ -84,7 +94,7 @@
     "@electron/rebuild": "^4.0.4",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.61.0",
-    "@types/node": "^26.0.0",
+    "@types/node": "^24.0.0",
     "@typescript-eslint/eslint-plugin": "^8.61.1",
     "@typescript-eslint/parser": "^8.61.1",
     "@typescript/native": "npm:typescript@^7.0.2",
@@ -99,6 +109,7 @@
     "typescript": "^6.0.3",
     "vite": "^7.3.6",
     "vite-plugin-solid": "^2.11.12",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.9",
+    "@vitest/coverage-v8": "^4.1.9"
   }
 }

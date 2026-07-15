@@ -1,0 +1,25 @@
+name: Performance
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '19 3 * * 1'
+
+jobs:
+  baselines:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: xvfb-run -a npm run measure:baselines
+      - run: npm run measure:check
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: performance-results
+          path: .perf-results/
+          retention-days: 30

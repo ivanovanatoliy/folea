@@ -2,17 +2,13 @@ import { _electron as electron } from 'playwright';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { median, writePerformanceResult } from './performance-output.mjs';
 
 const runs = Number.parseInt(process.env.FOLEA_INPUT_PAINT_RUNS ?? '20', 10);
 
 const env = Object.fromEntries(
   Object.entries(process.env).filter((entry) => entry[1] !== undefined)
 );
-
-const median = (values) => {
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.floor(sorted.length / 2)];
-};
 
 const vaultRoot = await mkdtemp(path.join(os.tmpdir(), 'folea-input-paint-'));
 const longContent = Array.from({ length: 120 }, (_, i) => `Line ${i + 1} of scroll content.`).join(
@@ -83,12 +79,21 @@ try {
   const min = Math.min(...samples);
   const max = Math.max(...samples);
 
-  console.log(`input-to-paint measurement (${runs} runs):`);
+  console.log(`input-to-next-frame proxy (${runs} runs):`);
   console.log(`  median: ${med.toFixed(1)} ms`);
   console.log(`  min:    ${min.toFixed(1)} ms`);
   console.log(`  max:    ${max.toFixed(1)} ms`);
   console.log(`  target: ≤ 16 ms`);
   console.log(med <= 16 ? '  ✓ within budget' : '  ✗ OVER BUDGET');
+  await writePerformanceResult('input-to-next-frame', {
+    noteCount: 1,
+    runs,
+    medianMs: med,
+    minMs: min,
+    maxMs: max,
+    budgetMs: 16,
+    samplesMs: samples
+  });
 } finally {
   await electronApp?.close();
   await rm(vaultRoot, { recursive: true, force: true });

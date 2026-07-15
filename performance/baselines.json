@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-07-15T11:35:01.464Z",
+  "referenceEnvironment": {
+    "platform": "linux",
+    "architecture": "x64",
+    "node": "v24.15.0",
+    "cpu": "Intel(R) Core(TM) i7-8565U CPU @ 1.80GHz"
+  },
+  "metrics": {
+    "coldStart": {
+      "observedMs": 622,
+      "budgetMs": 3000
+    },
+    "warmNoteOpen": {
+      "observedMedianMs": 5,
+      "budgetMedianMs": 100
+    },
+    "inputToNextFrame": {
+      "observedMedianMs": 13.9,
+      "budgetMedianMs": 20,
+      "methodology": "keydown dispatch through the next animation-frame callback; not compositor paint"
+    },
+    "linkGraphDelta": {
+      "methodology": "filesystem change to completed incremental renderer graph update",
+      "budgetMedianMs": 5,
+      "fixedVaults": [
+        {
+          "noteCount": 20,
+          "observedMedianMs": 0.1
+        },
+        {
+          "noteCount": 50,
+          "observedMedianMs": 0.2
+        },
+        {
+          "noteCount": 100,
+          "observedMedianMs": 0.1
+        }
+      ]
+    }
+  }
+}

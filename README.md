@@ -163,6 +163,15 @@ npm run rebuild
 
 `npm run test:e2e` launches Electron through Playwright. 
 
+### Performance measurements
+
+`npm run measure:baselines` writes machine-readable results to `.perf-results/`. The link-graph
+measurement uses fixed synthetic vaults of 20, 50, and 100 notes by default; override them with
+`FOLEA_GRAPH_VAULT_SIZES`. The input metric is intentionally named `input-next-frame`: it measures
+keydown dispatch through the next animation-frame callback and is a responsiveness proxy, not a
+compositor-paint timestamp. Committed budgets and reference measurements live in
+`performance/baselines.json`.
+
 ## Contributing
 
 The repository is currently **read-only** — no external contributions are accepted while core

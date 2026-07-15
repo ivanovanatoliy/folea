@@ -4,6 +4,7 @@ dist/
 coverage/
 test-results/
 playwright-report/
+.claude/settings.local.json
 
 CONTRIBUTING.md
 README.md
