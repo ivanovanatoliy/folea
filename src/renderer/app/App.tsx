@@ -68,8 +68,8 @@ import {
   type KeymapSet
 } from '../../shared/keys-config';
 import { dispatchSmartJump } from '../nav';
-import { buildLinkGraph, resolveNoteHref } from '../nav/link-graph';
-import type { LinkGraph, NoteRef } from '../nav/link-graph';
+import { createLinkGraphIndex, resolveNoteHref } from '../nav/link-graph';
+import type { LinkGraph, LinkGraphIndex, NoteRef } from '../nav/link-graph';
 import { findLocalSearchHits, type SearchScope } from '../search';
 import {
   createSurface,
@@ -89,6 +89,7 @@ import type { SearchHit } from '../../shared/ipc/search';
 import {
   parseVaultEntryName,
   type NoteMeta,
+  type VaultChange,
   type VaultDirectory,
   type VaultTemplate
 } from '../../shared/ipc/vault';
@@ -233,11 +234,16 @@ export const App = () => {
   let surfaceMount: HTMLDivElement | undefined;
   let surface: SurfaceController | undefined;
   let caretEngine: CaretEngine | undefined;
-  let renderSourceFiles: CompileSourceFiles | undefined;
+  let renderSourceFiles: Map<string, string> | undefined;
+  let renderSourceVersion = 0;
+  let linkGraphIndex: LinkGraphIndex | undefined;
   let detachKeyListener: (() => void) | undefined;
   let prefetchTimer: ReturnType<typeof setTimeout> | undefined;
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
   let quickOpenSearchTimer: ReturnType<typeof setTimeout> | undefined;
+  let sourceDeltaTimer: ReturnType<typeof setTimeout> | undefined;
+  let sourceDeltaTail: Promise<void> = Promise.resolve();
+  const pendingSourceChanges = new Map<string, VaultChange>();
   let prefetchInFlight = false;
   let queuedPrefetchRelPath: string | undefined;
   let pendingSearchTarget: (SurfaceSearchTarget & { readonly relPath: string }) | undefined;
@@ -297,7 +303,7 @@ export const App = () => {
     () => {
       setWarmupMessage(undefined);
     },
-    async () => renderSourceFiles ?? (await readTypstSourceFiles())
+    (noteId, dependencies) => surface?.registerDependencies(noteId, dependencies)
   );
 
   const resolvedTheme = createMemo<ResolvedTheme>(() => {
@@ -399,6 +405,87 @@ export const App = () => {
       console.debug('Unable to read Typst render dependency snapshot', error);
       return new Map<string, string>();
     }
+  };
+
+  const applySourceDeltaBatch = async (events: readonly VaultChange[]): Promise<void> => {
+    const sourceFiles = renderSourceFiles;
+    if (!sourceFiles || events.some((event) => event.kind === 'structural')) {
+      await refreshVault();
+      return;
+    }
+
+    const changed = new Map<string, string>();
+    const deleted: string[] = [];
+    for (const event of events) {
+      if (event.kind === 'deleted') {
+        deleted.push(event.relPath);
+        continue;
+      }
+      if (event.kind === 'created' || event.kind === 'changed') {
+        try {
+          changed.set(
+            event.note.relPath,
+            await window.folea.vault.read({ relPath: event.note.relPath })
+          );
+        } catch {
+          deleted.push(event.note.relPath);
+        }
+      }
+    }
+
+    for (const [path, source] of changed) sourceFiles.set(path, source);
+    for (const path of deleted) sourceFiles.delete(path);
+    const version = ++renderSourceVersion;
+    const affected =
+      (await surface?.updateFiles(version, changed, deleted)) ?? ([] as readonly string[]);
+    window.dispatchEvent(
+      new CustomEvent('folea:source-synced', {
+        detail: {
+          kind: 'delta',
+          version,
+          changedCount: changed.size,
+          deletedCount: deleted.length,
+          totalFileCount: sourceFiles.size,
+          affectedNoteIds: affected
+        }
+      })
+    );
+    const currentRelPath = selectedRelPath();
+    const currentSource = changed.get(currentRelPath);
+    if (currentSource !== undefined) {
+      setCurrentSource(currentSource);
+      surface?.rerender(currentRelPath);
+    } else if (deleted.includes(currentRelPath)) {
+      const generation = ++navigationGeneration;
+      await renderSelectedNote(generation, notes());
+    } else if (affected.includes(currentRelPath)) {
+      surface?.rerender(currentRelPath);
+    }
+
+    const availableNotes = new Set(notes().map((note) => note.relPath));
+    surface?.recompile(
+      affected.filter((noteId) => noteId !== currentRelPath && availableNotes.has(noteId))
+    );
+    await updateLinkGraphFromDeltas(events, changed);
+  };
+
+  const scheduleSourceDelta = (event: VaultChange): void => {
+    const path =
+      event.kind === 'structural'
+        ? event.relPath
+        : event.kind === 'deleted'
+          ? event.relPath
+          : event.note.relPath;
+    pendingSourceChanges.set(path, event);
+    if (sourceDeltaTimer !== undefined) clearTimeout(sourceDeltaTimer);
+    sourceDeltaTimer = setTimeout(() => {
+      sourceDeltaTimer = undefined;
+      const events = [...pendingSourceChanges.values()];
+      pendingSourceChanges.clear();
+      sourceDeltaTail = sourceDeltaTail
+        .then(() => applySourceDeltaBatch(events))
+        .catch((error) => console.debug('Unable to apply Typst source delta', error));
+    }, 80);
   };
 
   const refreshOutline = (): void => {
@@ -572,16 +659,13 @@ export const App = () => {
     if (generation !== navigationGeneration) return;
 
     try {
-      const [source, sourceFiles] = await Promise.all([
-        window.folea.vault.read({ relPath }),
-        cacheHit ? Promise.resolve(undefined) : readTypstSourceFiles()
-      ]);
+      const source = await window.folea.vault.read({ relPath });
 
       if (generation !== navigationGeneration || selectedRelPath() !== relPath) return;
 
       setCurrentSource(source);
       if (!cacheHit) {
-        surface?.render(relPath, source, sourceFiles!);
+        surface?.render(relPath);
       }
     } catch {
       if (generation === navigationGeneration && !cacheHit) {
@@ -607,16 +691,13 @@ export const App = () => {
       return;
     }
 
-    const [source, sourceFiles] = await Promise.all([
-      window.folea.vault.read({ relPath: nextRelPath }),
-      readTypstSourceFiles()
-    ]);
+    const source = await window.folea.vault.read({ relPath: nextRelPath });
 
     if (generation !== navigationGeneration || selectedRelPath() !== nextRelPath) {
       return;
     }
 
-    surface?.render(nextRelPath, source, sourceFiles);
+    surface?.render(nextRelPath);
     setCurrentSource(source);
   };
 
@@ -661,13 +742,8 @@ export const App = () => {
     prefetchInFlight = true;
 
     try {
-      const [source, sourceFiles] = await Promise.all([
-        window.folea.vault.read({ relPath }),
-        readTypstSourceFiles()
-      ]);
-
       if (selectedRelPath() !== relPath) {
-        surface?.prefetch(relPath, source, sourceFiles);
+        surface?.prefetch(relPath);
       }
     } catch (error) {
       console.debug('Unable to prefetch highlighted note', error);
@@ -693,16 +769,51 @@ export const App = () => {
     try {
       const files = await readTypstSourceFiles();
       const t0 = performance.now();
-      setLinkGraph(buildLinkGraph(files, notes()));
+      linkGraphIndex = createLinkGraphIndex(files, notes());
+      setLinkGraph(linkGraphIndex.snapshot());
       const durationMs = performance.now() - t0;
       window.dispatchEvent(
-        new CustomEvent<{ durationMs: number; noteCount: number }>('folea:graph-built', {
-          detail: { durationMs, noteCount: notes().length }
-        })
+        new CustomEvent<{ durationMs: number; noteCount: number; mode: 'full' }>(
+          'folea:graph-built',
+          {
+            detail: { durationMs, noteCount: notes().length, mode: 'full' }
+          }
+        )
       );
     } catch {
       // Graph remains stale until next vault change
     }
+  };
+
+  const updateLinkGraphFromDeltas = async (
+    events: readonly VaultChange[],
+    changed: ReadonlyMap<string, string>
+  ): Promise<void> => {
+    const canUpdateIncrementally =
+      linkGraphIndex !== undefined && events.every((event) => event.kind === 'changed');
+    if (!canUpdateIncrementally) {
+      await rebuildLinkGraph();
+      return;
+    }
+
+    const t0 = performance.now();
+    for (const [relPath, source] of changed) {
+      linkGraphIndex!.updateSource(relPath, source);
+    }
+    setLinkGraph(linkGraphIndex!.snapshot());
+    window.dispatchEvent(
+      new CustomEvent<{
+        durationMs: number;
+        noteCount: number;
+        mode: 'incremental';
+      }>('folea:graph-built', {
+        detail: {
+          durationMs: performance.now() - t0,
+          noteCount: notes().length,
+          mode: 'incremental'
+        }
+      })
+    );
   };
 
   const loadVaultStateOrDefault = async (): Promise<VaultStateFileV1> => {
@@ -721,7 +832,12 @@ export const App = () => {
     }
   };
 
-  const startWarmup = (allNotes: readonly NoteMeta[], vaultState: VaultStateFileV1): void => {
+  const startWarmup = (
+    allNotes: readonly NoteMeta[],
+    vaultState: VaultStateFileV1,
+    version: number,
+    sourceFiles: CompileSourceFiles
+  ): void => {
     const current = selectedRelPath();
     const recentPaths = new Set(vaultState.recentNotes.map((n) => n.relPath));
 
@@ -734,7 +850,11 @@ export const App = () => {
     });
 
     warmupQueue.cancel();
-    warmupQueue.start(sorted.map((n) => n.relPath));
+    warmupQueue.start(
+      version,
+      sourceFiles,
+      sorted.map((n) => n.relPath)
+    );
   };
 
   const refreshVault = async (vsParam?: VaultStateFileV1): Promise<void> => {
@@ -746,6 +866,20 @@ export const App = () => {
       setNotes(listedNotes);
       setDirectories([...snapshot.directories]);
       setVaultStatus(listedNotes.length === 0 ? 'empty vault' : 'vault open');
+      const sourceFiles = await readTypstSourceFiles();
+      const sourceVersion = ++renderSourceVersion;
+      await surface?.syncSnapshot(sourceVersion, sourceFiles);
+      window.dispatchEvent(
+        new CustomEvent('folea:source-synced', {
+          detail: {
+            kind: 'snapshot',
+            version: sourceVersion,
+            changedCount: sourceFiles.size,
+            deletedCount: 0,
+            totalFileCount: sourceFiles.size
+          }
+        })
+      );
 
       const vs = vsParam ?? (await loadVaultStateOrDefault());
       setRecentNotes(vs.recentNotes);
@@ -797,7 +931,7 @@ export const App = () => {
 
       setTimeout(() => {
         void window.folea.vaultState.load().then((freshVs) => {
-          startWarmup(listedNotes, freshVs);
+          startWarmup(listedNotes, freshVs, sourceVersion, sourceFiles);
         });
       }, 500);
     } catch {
@@ -1161,6 +1295,7 @@ export const App = () => {
     setCurrentSource('');
     setOutlineEntries([]);
     setLinkGraph(null);
+    linkGraphIndex = undefined;
     setLinksBacklinks([]);
     setLinksOutgoing([]);
     renderSourceFiles = undefined;
@@ -1939,50 +2074,15 @@ export const App = () => {
     void performStartup();
 
     const unsubscribeVault = window.folea.vault.onChanged((event) => {
-      renderSourceFiles = undefined;
       if (event.kind === 'structural') {
-        void window.folea.vault.snapshot().then((snapshot) => {
-          setNotes(vaultIndex.rebuild(snapshot.notes));
-          setDirectories([...snapshot.directories]);
-          void rebuildLinkGraph();
-        });
+        scheduleSourceDelta(event);
         return;
-      }
-      if (event.kind === 'deleted') {
-        surface?.invalidate(event.relPath);
       }
 
       const nextNotes = vaultIndex.applyChange(event);
       setNotes(nextNotes);
       setVaultStatus(nextNotes.length === 0 ? 'empty vault' : 'vault open');
-      void rebuildLinkGraph();
-
-      const currentRelPath = selectedRelPath();
-      const isCurrentNote =
-        (event.kind === 'changed' || event.kind === 'created') &&
-        event.note.relPath === currentRelPath;
-      const isCurrentDeleted = event.kind === 'deleted' && event.relPath === currentRelPath;
-
-      if (isCurrentNote) {
-        void (async () => {
-          try {
-            const [source, sourceFiles] = await Promise.all([
-              window.folea.vault.read({ relPath: currentRelPath }),
-              readTypstSourceFiles()
-            ]);
-            if (selectedRelPath() === currentRelPath) {
-              surface?.rerender(currentRelPath, source, sourceFiles);
-            }
-          } catch {
-            surface?.showError([{ severity: 'error', message: 'Unable to read selected note' }]);
-          }
-        })();
-      } else if (isCurrentDeleted) {
-        const generation = ++navigationGeneration;
-        void renderSelectedNote(generation, nextNotes).catch(() =>
-          surface?.showError([{ severity: 'error', message: 'Unable to read selected note' }])
-        );
-      }
+      scheduleSourceDelta(event);
     });
 
     const unsubscribeSearchResult = window.folea.search.onResult((event) => {
@@ -2071,6 +2171,8 @@ export const App = () => {
       clearPrefetchTimer();
       clearSearchTimer();
       clearQuickOpenSearchTimer();
+      if (sourceDeltaTimer !== undefined) clearTimeout(sourceDeltaTimer);
+      pendingSourceChanges.clear();
       warmupQueue.dispose();
       positionDebounce.dispose();
       window.folea.search.cancel();

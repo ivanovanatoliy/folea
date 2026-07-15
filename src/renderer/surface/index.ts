@@ -1,6 +1,6 @@
 import {
   type OutlineEntry,
-  parseCompileResult,
+  parseTypstWorkerResult,
   type CompileRequest,
   type CompileResult,
   type CompileSourceFiles,
@@ -52,10 +52,18 @@ export interface SurfaceSearchTarget {
 }
 
 export interface SurfaceController {
-  render(noteId: string, source: string, sourceFiles?: CompileSourceFiles): void;
+  syncSnapshot(version: number, sourceFiles: CompileSourceFiles): Promise<void>;
+  updateFiles(
+    version: number,
+    changed: CompileSourceFiles,
+    deleted: readonly string[]
+  ): Promise<readonly string[]>;
+  registerDependencies(noteId: string, dependencies: readonly string[]): void;
+  recompile(noteIds: readonly string[]): void;
+  render(noteId: string): void;
   renderFromCache(noteId: string, cacheKey: string, entry: RenderCacheEntryV1): boolean;
-  rerender(noteId: string, source: string, sourceFiles?: CompileSourceFiles): void;
-  prefetch(noteId: string, source: string, sourceFiles?: CompileSourceFiles): void;
+  rerender(noteId: string): void;
+  prefetch(noteId: string): void;
   invalidate(noteId: string): void;
   getOutline(): readonly OutlineEntry[];
   getTextLayer(): import('../../shared/worker/typst').TextLayerModel | undefined;
@@ -114,6 +122,17 @@ export const createSurface = (
   let lastSearchIndex = -1;
   let searchHighlight: HTMLDivElement | undefined;
   let rerenderSnapshot: string[] | null = null;
+  let textLayerTsels: readonly HTMLElement[] = [];
+  let pageStatusFrame: number | undefined;
+  let sourceVersion = 0;
+  const snapshotResolvers = new Map<
+    number,
+    { resolve: () => void; reject: (error: Error) => void }
+  >();
+  const updateResolvers = new Map<
+    number,
+    { resolve: (affected: readonly string[]) => void; reject: (error: Error) => void }
+  >();
 
   const post = (request: CompileRequest): void => {
     worker.postMessage(request);
@@ -158,11 +177,15 @@ export const createSurface = (
   };
 
   const emitPageStatus = (): void => {
-    window.dispatchEvent(
-      new CustomEvent<SurfacePageStatusDetail>('folea:surface-page-status', {
-        detail: getPageStatus()
-      })
-    );
+    if (pageStatusFrame !== undefined) return;
+    pageStatusFrame = requestAnimationFrame(() => {
+      pageStatusFrame = undefined;
+      window.dispatchEvent(
+        new CustomEvent<SurfacePageStatusDetail>('folea:surface-page-status', {
+          detail: getPageStatus()
+        })
+      );
+    });
   };
 
   const removeSearchHighlight = (): void => {
@@ -178,9 +201,11 @@ export const createSurface = (
   const getTextLayer = (): import('../../shared/worker/typst').TextLayerModel | undefined =>
     latestTextLayer;
 
-  const getTextLayerTsels = (): readonly HTMLElement[] => [
-    ...container.querySelectorAll<HTMLElement>('.typst-document .tsel')
-  ];
+  const getTextLayerTsels = (): readonly HTMLElement[] => textLayerTsels;
+
+  const rebuildTextLayerIndex = (): void => {
+    textLayerTsels = [...container.querySelectorAll<HTMLElement>('.typst-document .tsel')];
+  };
 
   const setSearchHighlight = (index: number): boolean => {
     const documentNode = container.querySelector<HTMLElement>('.typst-document');
@@ -263,6 +288,7 @@ export const createSurface = (
     documentNode.style.minHeight = `${result.artifact.height}px`;
     documentNode.replaceChildren(svgElement);
     container.replaceChildren(documentNode);
+    rebuildTextLayerIndex();
     container.dataset.cacheKey = result.cacheKey;
     container.dataset.fromCache = String(result.fromCache);
     container.dataset.durationMs = String(durationMs);
@@ -294,7 +320,7 @@ export const createSurface = (
         container.scrollTop = restoredScrollTop;
       }
 
-      const newTsels = [...container.querySelectorAll<HTMLElement>('.typst-document .tsel')];
+      const newTsels = getTextLayerTsels();
       let changeEl: HTMLElement | undefined;
       const limit = Math.max(snapshot.length, newTsels.length);
       for (let i = 0; i < limit; i++) {
@@ -328,14 +354,6 @@ export const createSurface = (
 
     setState('rendered');
     emitPageStatus();
-
-    if (!result.fromCache) {
-      window.dispatchEvent(
-        new CustomEvent<SurfaceCacheWriteDetail>('folea:surface-cache-write', {
-          detail: { noteId: result.noteId, result }
-        })
-      );
-    }
 
     emitRendered({
       noteId: result.noteId,
@@ -376,6 +394,7 @@ export const createSurface = (
 
     errorNode.append(list);
     container.replaceChildren(errorNode);
+    textLayerTsels = [];
     latestOutline = [];
     latestTextLayer = undefined;
     clearSearchHighlight();
@@ -391,7 +410,23 @@ export const createSurface = (
   };
 
   const onMessage = (event: MessageEvent<unknown>): void => {
-    const result = parseCompileResult(event.data);
+    const result = parseTypstWorkerResult(event.data);
+
+    if (result.type === 'snapshotSynced') {
+      sourceVersion = result.version;
+      snapshotResolvers.get(result.version)?.resolve();
+      snapshotResolvers.delete(result.version);
+      return;
+    }
+
+    if (result.type === 'filesUpdated') {
+      sourceVersion = result.version;
+      updateResolvers.get(result.version)?.resolve(result.affectedNoteIds);
+      updateResolvers.delete(result.version);
+      return;
+    }
+
+    if (result.version !== sourceVersion) return;
 
     if (result.type === 'prefetched') {
       emitPrefetched({
@@ -400,6 +435,14 @@ export const createSurface = (
         fromCache: result.fromCache
       });
       return;
+    }
+
+    if (result.type === 'rendered' && !result.fromCache) {
+      window.dispatchEvent(
+        new CustomEvent<SurfaceCacheWriteDetail>('folea:surface-cache-write', {
+          detail: { noteId: result.noteId, result }
+        })
+      );
     }
 
     if (result.noteId !== latestNoteId) {
@@ -506,11 +549,36 @@ export const createSurface = (
   window.addEventListener('folea:zoom-changed', handleZoomChanged);
 
   controller = {
-    render(
-      noteId: string,
-      source: string,
-      sourceFiles: CompileSourceFiles = new Map<string, string>()
-    ): void {
+    syncSnapshot(version: number, sourceFiles: CompileSourceFiles): Promise<void> {
+      if (disposed) return Promise.reject(new Error('Surface is disposed'));
+      return new Promise((resolve, reject) => {
+        snapshotResolvers.set(version, { resolve, reject });
+        post({ type: 'syncSnapshot', version, files: sourceFiles });
+      });
+    },
+
+    updateFiles(
+      version: number,
+      changed: CompileSourceFiles,
+      deleted: readonly string[]
+    ): Promise<readonly string[]> {
+      if (disposed) return Promise.reject(new Error('Surface is disposed'));
+      return new Promise((resolve, reject) => {
+        updateResolvers.set(version, { resolve, reject });
+        post({ type: 'updateFiles', version, changed, deleted });
+      });
+    },
+
+    registerDependencies(noteId: string, dependencies: readonly string[]): void {
+      if (!disposed) post({ type: 'registerDependencies', noteId, dependencies });
+    },
+
+    recompile(noteIds: readonly string[]): void {
+      if (disposed) return;
+      for (const noteId of noteIds) post({ type: 'compile', noteId, version: sourceVersion });
+    },
+
+    render(noteId: string): void {
       if (disposed) {
         return;
       }
@@ -520,7 +588,7 @@ export const createSurface = (
       rerenderSnapshot = null;
       setState('loading');
       emitPageStatus();
-      post({ type: 'compile', noteId, source, sourceFiles });
+      post({ type: 'compile', noteId, version: sourceVersion });
     },
 
     renderFromCache(noteId: string, cacheKey: string, entry: RenderCacheEntryV1): boolean {
@@ -539,6 +607,7 @@ export const createSurface = (
         latestStartedAt = performance.now();
         rerenderSnapshot = null;
         container.replaceChildren(documentNode);
+        rebuildTextLayerIndex();
         container.dataset.cacheKey = cacheKey;
         container.dataset.fromCache = 'true';
         container.dataset.durationMs = '0';
@@ -568,31 +637,21 @@ export const createSurface = (
       }
     },
 
-    rerender(
-      noteId: string,
-      source: string,
-      sourceFiles: CompileSourceFiles = new Map<string, string>()
-    ): void {
+    rerender(noteId: string): void {
       if (disposed) return;
 
       latestNoteId = noteId;
       latestStartedAt = performance.now();
       // Snapshot text spans for change-location detection in paintRendered().
-      rerenderSnapshot = [...container.querySelectorAll<HTMLElement>('.typst-document .tsel')].map(
-        (el) => el.textContent ?? ''
-      );
+      rerenderSnapshot = getTextLayerTsels().map((el) => el.textContent ?? '');
       // No loading state, no content replacement — existing render stays visible
       // until paintRendered() swaps in the new result.
-      post({ type: 'compile', noteId, source, sourceFiles });
+      post({ type: 'compile', noteId, version: sourceVersion });
     },
 
-    prefetch(
-      noteId: string,
-      source: string,
-      sourceFiles: CompileSourceFiles = new Map<string, string>()
-    ): void {
+    prefetch(noteId: string): void {
       if (!disposed) {
-        post({ type: 'prefetch', noteId, source, sourceFiles });
+        post({ type: 'prefetch', noteId, version: sourceVersion });
       }
     },
 
@@ -612,7 +671,7 @@ export const createSurface = (
 
     revealSearchTarget(target: SurfaceSearchTarget): boolean {
       lastSearchQuery = target.query.trim();
-      const match = findRenderedSearchMatch(container, target);
+      const match = findRenderedSearchMatch(container, target, getTextLayerTsels());
       if (!match) {
         clearSearchHighlight();
         return false;
@@ -651,6 +710,7 @@ export const createSurface = (
       caretEngine.dispose();
       clearSearchHighlight();
       container.replaceChildren();
+      textLayerTsels = [];
       container.dataset.fromCache = 'false';
       delete container.dataset.durationMs;
       delete container.dataset.cacheKey;
@@ -664,6 +724,13 @@ export const createSurface = (
       }
 
       disposed = true;
+      const disposedError = new Error('Surface is disposed');
+      for (const pending of snapshotResolvers.values()) pending.reject(disposedError);
+      for (const pending of updateResolvers.values()) pending.reject(disposedError);
+      snapshotResolvers.clear();
+      updateResolvers.clear();
+      if (pageStatusFrame !== undefined) cancelAnimationFrame(pageStatusFrame);
+      pageStatusFrame = undefined;
       caretEngine.dispose();
       worker.removeEventListener('message', onMessage);
       container.removeEventListener('scroll', emitPageStatus);
@@ -848,7 +915,10 @@ interface RenderedSearchMatch {
 
 const findRenderedSearchMatch = (
   container: HTMLElement,
-  target: SurfaceSearchTarget
+  target: SurfaceSearchTarget,
+  candidates: readonly HTMLElement[] = [
+    ...container.querySelectorAll<HTMLElement>('.typst-document .tsel')
+  ]
 ): RenderedSearchMatch | undefined => {
   const documentNode = container.querySelector<HTMLElement>('.typst-document');
   if (!documentNode) {
@@ -861,7 +931,6 @@ const findRenderedSearchMatch = (
     return undefined;
   }
 
-  const candidates = [...documentNode.querySelectorAll<HTMLElement>('.tsel')];
   const matchIndex =
     findTextCandidateIndex(candidates, preview) ??
     findTextCandidateIndex(candidates, query) ??

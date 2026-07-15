@@ -393,7 +393,12 @@ export const readRenderCache = async (
       };
       await saveManifest(vaultRoot, updatedManifest).catch(() => undefined);
 
-      return { hit: true, entry: cacheEntry, cacheKey: entry.cacheKey };
+      return {
+        hit: true,
+        entry: cacheEntry,
+        cacheKey: entry.cacheKey,
+        inputFiles: entry.inputFiles
+      };
     } catch {
       continue;
     }

@@ -160,6 +160,38 @@ const getLegacyEngine = (): Promise<TypstEngine> => {
 };
 
 describe('typst worker engine integration', () => {
+  it('recompiles an imported dependency from an encoded source delta', async () => {
+    const service = new TypstCompileService(await getEngine(), new ArtifactCache());
+    await service.handle({
+      type: 'syncSnapshot',
+      version: 1,
+      files: new Map([
+        ['main.typ', '#import "shared.typ": value\n= Main\n#value'],
+        ['shared.typ', '#let value = [Initial shared]']
+      ])
+    });
+    const initial = await service.handle({ type: 'compile', noteId: 'main.typ', version: 1 });
+    const delta = await service.handle({
+      type: 'updateFiles',
+      version: 2,
+      changed: new Map([['shared.typ', '#let value = [Updated shared]']]),
+      deleted: []
+    });
+    const updated = await service.handle({ type: 'compile', noteId: 'main.typ', version: 2 });
+    const secondDelta = await service.handle({
+      type: 'updateFiles',
+      version: 3,
+      changed: new Map([['shared.typ', '#let value = [Newest shared]']]),
+      deleted: []
+    });
+
+    expect(delta).toMatchObject({ affectedNoteIds: ['main.typ', 'shared.typ'] });
+    expect(secondDelta).toMatchObject({ affectedNoteIds: ['main.typ', 'shared.typ'] });
+    expect(updated?.type === 'rendered' ? updated.fromCache : undefined).toBe(false);
+    expect(initial?.type === 'rendered' ? initial.textLayer.text : '').toContain('Initial shared');
+    expect(updated?.type === 'rendered' ? updated.textLayer.text : '').toContain('Updated shared');
+  }, 20_000);
+
   it('compiles a Typst note to SVG with text', async () => {
     const output = await (
       await getEngine()

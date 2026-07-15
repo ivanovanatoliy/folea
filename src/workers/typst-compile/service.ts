@@ -1,27 +1,98 @@
-import type { CompileRequest, CompileResult, CompileSourceFiles } from '../../shared/worker/typst';
+import type {
+  CompileRequest,
+  CompileResult,
+  CompileSourceFiles,
+  TypstWorkerResult
+} from '../../shared/worker/typst';
+import { parseTypstReferences, resolveTypstReferencePath } from '../../shared/typst-links';
 
 import { ArtifactCache, hashSource, type CachedDependency } from './cache';
 import type { TypstEngine } from './engine';
 
 export class TypstCompileService {
-  private queue = Promise.resolve();
+  private compileQueue = Promise.resolve();
+  private requestQueue = Promise.resolve();
+  private sourceFiles = new Map<string, string>();
+  private sourceVersion: number | undefined;
+  private readonly dependenciesByNote = new Map<string, Set<string>>();
+  private readonly notesByDependency = new Map<string, Set<string>>();
+  private readonly sourceHashByNote = new Map<string, string>();
 
   constructor(
     private readonly engine: TypstEngine,
     private readonly cache = new ArtifactCache()
   ) {}
 
-  handle(request: CompileRequest): Promise<CompileResult | undefined> {
-    if (request.type === 'invalidate') {
-      this.cache.invalidate(request.noteId);
-      return Promise.resolve(undefined);
+  handle(request: CompileRequest): Promise<TypstWorkerResult | undefined> {
+    const result = this.requestQueue.then(() => this.handleSerial(request));
+    this.requestQueue = result.then(
+      () => undefined,
+      () => undefined
+    );
+    return result;
+  }
+
+  private async handleSerial(request: CompileRequest): Promise<TypstWorkerResult | undefined> {
+    if (request.type === 'syncSnapshot') {
+      this.sourceFiles = new Map(request.files);
+      this.sourceVersion = request.version;
+      this.dependenciesByNote.clear();
+      this.notesByDependency.clear();
+      this.sourceHashByNote.clear();
+      this.cache.clear();
+      this.engine.syncSnapshot?.(this.sourceFiles);
+      return { type: 'snapshotSynced', version: request.version };
     }
 
-    const result = this.compile(
-      request.noteId,
-      request.source,
-      request.sourceFiles ?? new Map<string, string>()
-    );
+    if (request.type === 'updateFiles') {
+      if (this.sourceVersion === undefined || request.version <= this.sourceVersion) {
+        throw new Error('Typst source delta version must advance the synchronized snapshot');
+      }
+      const affected = this.affectedNotes([...request.changed.keys(), ...request.deleted]);
+      for (const [path, source] of request.changed) this.sourceFiles.set(path, source);
+      for (const path of request.deleted) this.sourceFiles.delete(path);
+      this.engine.updateFiles?.(request.changed, request.deleted);
+      this.sourceVersion = request.version;
+      for (const noteId of affected) this.cache.invalidate(noteId);
+      return {
+        type: 'filesUpdated',
+        version: request.version,
+        affectedNoteIds: [...affected].sort((left, right) => left.localeCompare(right))
+      };
+    }
+
+    if (request.type === 'invalidate') {
+      this.cache.invalidate(request.noteId);
+      return undefined;
+    }
+
+    if (request.type === 'registerDependencies') {
+      this.registerDependencies(request.noteId, request.dependencies);
+      return undefined;
+    }
+
+    if (this.sourceVersion === undefined) {
+      throw new Error('Typst source snapshot is not synchronized');
+    }
+    if (request.version !== this.sourceVersion) {
+      return {
+        type: 'error',
+        noteId: request.noteId,
+        version: request.version,
+        diagnostics: [{ severity: 'error', message: 'Typst source snapshot is stale' }]
+      };
+    }
+    const source = this.sourceFiles.get(request.noteId);
+    if (source === undefined) {
+      return {
+        type: 'error',
+        noteId: request.noteId,
+        version: request.version,
+        diagnostics: [{ severity: 'error', message: 'Typst note is missing from the snapshot' }]
+      };
+    }
+
+    const result = this.compile(request.noteId, source, this.sourceFiles, request.version, true);
 
     if (request.type === 'prefetch') {
       return result.then((prefetchResult) => {
@@ -32,6 +103,7 @@ export class TypstCompileService {
         return {
           type: 'prefetched',
           noteId: prefetchResult.noteId,
+          version: prefetchResult.version,
           cacheKey: prefetchResult.cacheKey,
           fromCache: prefetchResult.fromCache
         };
@@ -44,7 +116,9 @@ export class TypstCompileService {
   async compile(
     noteId: string,
     source: string,
-    sourceFiles: CompileSourceFiles = new Map<string, string>()
+    sourceFiles: CompileSourceFiles = new Map<string, string>(),
+    version = 0,
+    useSynchronizedEngine = false
   ): Promise<CompileResult> {
     const sourceLookup = createSourceLookup(noteId, source, sourceFiles);
     // Key on noteId + source, not source alone: two notes can share byte-identical source yet
@@ -57,9 +131,15 @@ export class TypstCompileService {
     const cached = this.cache.get(noteId, cacheKey);
 
     if (cached && (await dependenciesMatch(cached.dependencies, sourceLookup))) {
+      this.registerDependencies(
+        noteId,
+        cached.dependencies.map((dependency) => dependency.path)
+      );
+      this.sourceHashByNote.set(noteId, contentHash);
       return {
         type: 'rendered',
         noteId,
+        version,
         cacheKey,
         artifact: cached.artifact,
         textLayer: cached.textLayer,
@@ -69,20 +149,41 @@ export class TypstCompileService {
       };
     }
 
-    return this.enqueueCompile(noteId, source, sourceFiles, cacheKey, sourceLookup);
+    return this.enqueueCompile(
+      noteId,
+      source,
+      sourceFiles,
+      version,
+      contentHash,
+      cacheKey,
+      sourceLookup,
+      useSynchronizedEngine
+    );
   }
 
   private enqueueCompile(
     noteId: string,
     source: string,
     sourceFiles: CompileSourceFiles,
+    version: number,
+    contentHash: string,
     cacheKey: string,
-    sourceLookup: SourceLookup
+    sourceLookup: SourceLookup,
+    useSynchronizedEngine: boolean
   ): Promise<CompileResult> {
-    const result = this.queue.then(() =>
-      this.compileUncached(noteId, source, sourceFiles, cacheKey, sourceLookup)
+    const result = this.compileQueue.then(() =>
+      this.compileUncached(
+        noteId,
+        source,
+        sourceFiles,
+        version,
+        contentHash,
+        cacheKey,
+        sourceLookup,
+        useSynchronizedEngine
+      )
     );
-    this.queue = result.then(
+    this.compileQueue = result.then(
       () => undefined,
       () => undefined
     );
@@ -93,26 +194,46 @@ export class TypstCompileService {
     noteId: string,
     source: string,
     sourceFiles: CompileSourceFiles,
+    version: number,
+    contentHash: string,
     cacheKey: string,
-    sourceLookup: SourceLookup
+    sourceLookup: SourceLookup,
+    useSynchronizedEngine: boolean
   ): Promise<CompileResult> {
-    const output = await this.engine.compile({ mainPath: noteId, source, sourceFiles });
+    const output = await this.engine.compile({
+      mainPath: noteId,
+      source,
+      ...(useSynchronizedEngine ? {} : { sourceFiles })
+    });
 
     if (output.type === 'error') {
-      return { type: 'error', noteId, diagnostics: output.diagnostics };
+      return { type: 'error', noteId, version, diagnostics: output.diagnostics };
+    }
+
+    const dependencies = new Set([
+      ...output.dependencies,
+      ...collectStaticDependencies(noteId, sourceLookup)
+    ]);
+    if (this.sourceHashByNote.get(noteId) === contentHash) {
+      for (const dependency of this.dependenciesByNote.get(noteId) ?? []) {
+        if (sourceLookup.get(dependency) !== undefined) dependencies.add(dependency);
+      }
     }
 
     const render = {
       artifact: output.artifact,
       textLayer: output.textLayer,
       outline: output.outline,
-      dependencies: await hashDependencies(output.dependencies, sourceLookup)
+      dependencies: await hashDependencies([...dependencies], sourceLookup)
     };
     this.cache.put(noteId, cacheKey, render);
+    this.registerDependencies(noteId, [...dependencies]);
+    this.sourceHashByNote.set(noteId, contentHash);
 
     return {
       type: 'rendered',
       noteId,
+      version,
       cacheKey,
       artifact: render.artifact,
       textLayer: render.textLayer,
@@ -120,6 +241,42 @@ export class TypstCompileService {
       fromCache: false,
       inputFiles: render.dependencies.map((dep) => ({ path: dep.path, sha256: dep.contentHash }))
     };
+  }
+
+  private registerDependencies(noteId: string, dependencies: readonly string[]): void {
+    const previous = this.dependenciesByNote.get(noteId);
+    for (const path of previous ?? []) {
+      const notes = this.notesByDependency.get(path);
+      notes?.delete(noteId);
+      if (notes?.size === 0) this.notesByDependency.delete(path);
+    }
+
+    const next = new Set(dependencies);
+    this.dependenciesByNote.set(noteId, next);
+    for (const path of next) {
+      const notes = this.notesByDependency.get(path) ?? new Set<string>();
+      notes.add(noteId);
+      this.notesByDependency.set(path, notes);
+    }
+  }
+
+  private affectedNotes(changedPaths: readonly string[]): Set<string> {
+    const affected = new Set<string>();
+    const pending = [...changedPaths];
+    const visited = new Set<string>();
+    while (pending.length > 0) {
+      const path = pending.shift()!;
+      if (visited.has(path)) continue;
+      visited.add(path);
+      if (path.endsWith('.typ')) affected.add(path);
+      for (const noteId of this.notesByDependency.get(path) ?? []) {
+        if (!affected.has(noteId)) {
+          affected.add(noteId);
+          pending.push(noteId);
+        }
+      }
+    }
+    return affected;
   }
 }
 
@@ -171,4 +328,32 @@ const hashDependencies = async (
   }
 
   return dependencies;
+};
+
+const collectStaticDependencies = (
+  noteId: string,
+  sourceLookup: SourceLookup
+): readonly string[] => {
+  const dependencies = new Set<string>();
+  const pending = [noteId];
+  while (pending.length > 0) {
+    const path = pending.pop()!;
+    if (dependencies.has(path)) continue;
+    const source = sourceLookup.get(path);
+    if (source === undefined) continue;
+    dependencies.add(path);
+    for (const reference of parseTypstReferences(source)) {
+      if (reference.kind === 'link') continue;
+      const resolved = resolveTypstReferencePath(reference.rawTarget, path);
+      if (!resolved) continue;
+      const dependency =
+        sourceLookup.get(resolved) !== undefined
+          ? resolved
+          : sourceLookup.get(`${resolved}.typ`) !== undefined
+            ? `${resolved}.typ`
+            : undefined;
+      if (dependency && !dependencies.has(dependency)) pending.push(dependency);
+    }
+  }
+  return [...dependencies];
 };

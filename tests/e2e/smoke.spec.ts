@@ -470,6 +470,117 @@ test('opens a configured vault, lists notes, and renders the selected note', asy
   }
 });
 
+test('warms every note once and applies dependency-aware source deltas', async () => {
+  const vaultRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'folea-e2e-delta-vault-'));
+  await fs.writeFile(
+    path.join(vaultRoot, 'main.typ'),
+    '#import "shared.typ": value\n= Main\n#value\n',
+    'utf8'
+  );
+  await fs.writeFile(path.join(vaultRoot, 'shared.typ'), '#let value = [Initial shared]\n', 'utf8');
+  await fs.writeFile(path.join(vaultRoot, 'unrelated.typ'), '= Unrelated\n', 'utf8');
+  const manifestPath = path.join(vaultRoot, '.folea', 'render-cache', 'manifest.json');
+  interface CacheIdentity {
+    readonly cacheKey: string;
+    readonly inputHash: string;
+  }
+  const cacheIdentitiesByPath = async (): Promise<Record<string, CacheIdentity>> => {
+    const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+      entries: Record<string, { relPath: string; cacheKey: string; inputHash: string }>;
+    };
+    return Object.fromEntries(
+      Object.values(manifest.entries).map((entry) => [
+        entry.relPath,
+        { cacheKey: entry.cacheKey, inputHash: entry.inputHash }
+      ])
+    );
+  };
+
+  try {
+    const app = await launchApp({
+      ...currentEnv(),
+      FOLEA_ALLOW_TEST_VAULT_OPEN: '1',
+      FOLEA_TEST_VAULT_PATH: vaultRoot
+    });
+    const page = await app.firstWindow();
+    await expectSurfaceRendered(page);
+    await expect(page.getByTestId('typst-rendered-document')).toContainText('Initial shared');
+
+    await expect
+      .poll(() => cacheIdentitiesByPath().catch(() => ({})), { timeout: 20_000 })
+      .toEqual(
+        expect.objectContaining({
+          'main.typ': expect.any(Object),
+          'shared.typ': expect.any(Object),
+          'unrelated.typ': expect.any(Object)
+        })
+      );
+    const before = await cacheIdentitiesByPath();
+
+    const sourceDelta = page.evaluate(
+      () =>
+        new Promise<{
+          kind: string;
+          changedCount: number;
+          deletedCount: number;
+          totalFileCount: number;
+          affectedNoteIds: string[];
+        }>((resolve) => {
+          window.addEventListener(
+            'folea:source-synced',
+            (event) => resolve((event as CustomEvent).detail),
+            { once: true }
+          );
+        })
+    );
+    const graphUpdate = page.evaluate(
+      () =>
+        new Promise<{ mode: string }>((resolve) => {
+          window.addEventListener(
+            'folea:graph-built',
+            (event) => resolve((event as CustomEvent).detail),
+            { once: true }
+          );
+        })
+    );
+
+    await fs.writeFile(
+      path.join(vaultRoot, 'shared.typ'),
+      '#let value = [Updated shared]\n',
+      'utf8'
+    );
+
+    await expect(sourceDelta).resolves.toEqual({
+      kind: 'delta',
+      changedCount: 1,
+      deletedCount: 0,
+      totalFileCount: 3,
+      affectedNoteIds: ['main.typ', 'shared.typ'],
+      version: expect.any(Number)
+    });
+    await expect(page.getByTestId('typst-rendered-document')).toContainText('Updated shared');
+    await expect(graphUpdate).resolves.toMatchObject({ mode: 'incremental' });
+    await expect
+      .poll(
+        async () => {
+          const after = await cacheIdentitiesByPath();
+          return (
+            after['main.typ']?.cacheKey === before['main.typ']?.cacheKey &&
+            after['main.typ']?.inputHash !== before['main.typ']?.inputHash &&
+            after['shared.typ']?.cacheKey !== before['shared.typ']?.cacheKey &&
+            after['shared.typ']?.inputHash !== before['shared.typ']?.inputHash &&
+            after['unrelated.typ']?.cacheKey === before['unrelated.typ']?.cacheKey &&
+            after['unrelated.typ']?.inputHash === before['unrelated.typ']?.inputHash
+          );
+        },
+        { timeout: 20_000 }
+      )
+      .toBe(true);
+  } finally {
+    await fs.rm(vaultRoot, { recursive: true, force: true });
+  }
+});
+
 test('creates notes and directories through the real tree UI and dismisses its context menu', async () => {
   const vaultRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'folea-e2e-management-'));
   await fs.mkdir(path.join(vaultRoot, '_templates'));

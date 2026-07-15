@@ -69,6 +69,8 @@ export type TypstRenderOutput = TypstRenderSuccess | TypstRenderFailure;
 
 export interface TypstEngine {
   compile(input: TypstCompileInput): Promise<TypstRenderOutput>;
+  syncSnapshot?(files: CompileSourceFiles): void;
+  updateFiles?(changed: CompileSourceFiles, deleted: readonly string[]): void;
 }
 
 type WasmModuleReference =
@@ -89,6 +91,7 @@ export interface TypstEngineAssets {
 interface TypstAccessModel {
   files: Map<string, Uint8Array>;
   dependencyPaths: Set<string>;
+  revision: number;
 }
 
 const defaultFontUrls = [
@@ -159,13 +162,20 @@ export const createTypstEngine = async (
   assets: TypstEngineAssets = defaultAssets
 ): Promise<TypstEngine> => {
   const fontData = await assets.fontData();
-  const accessModel: TypstAccessModel = { files: new Map(), dependencyPaths: new Set() };
+  const accessModel: TypstAccessModel = {
+    files: new Map(),
+    dependencyPaths: new Set(),
+    revision: 0
+  };
+  let synchronizedFiles: Map<string, Uint8Array> | undefined;
+  const synchronizedShadows = new Map<string, Uint8Array>();
+  let synchronizedShadowsApplied = true;
 
   await initializeCompilerWasm(await assets.compilerWasmModule());
   const compilerBuilder = new TypstCompilerBuilder();
   await compilerBuilder.set_access_model(
     accessModel,
-    () => 0,
+    () => accessModel.revision,
     (path: string) => {
       const normalizedPath = normalizeVirtualPath(path);
       return (
@@ -205,10 +215,48 @@ export const createTypstEngine = async (
   const renderer = await new TypstRendererBuilder().build();
 
   return {
+    syncSnapshot: (files): void => {
+      synchronizedFiles = encodeSourceFiles(files);
+      synchronizedShadows.clear();
+      compiler.reset_shadow();
+      synchronizedShadowsApplied = true;
+      accessModel.revision += 1;
+    },
+    updateFiles: (changed, deleted): void => {
+      if (!synchronizedFiles) {
+        throw new Error('Typst source snapshot is not synchronized');
+      }
+      for (const [path, source] of changed) {
+        const virtualPath = toVirtualTypstPath(path);
+        const contents = textEncoder.encode(source);
+        synchronizedFiles.set(virtualPath, contents);
+        synchronizedShadows.set(virtualPath, contents);
+        compiler.map_shadow(virtualPath, contents);
+      }
+      for (const path of deleted) {
+        const virtualPath = toVirtualTypstPath(path);
+        synchronizedFiles.delete(virtualPath);
+        synchronizedShadows.delete(virtualPath);
+        compiler.unmap_shadow(virtualPath);
+      }
+      accessModel.revision += 1;
+    },
     compile: async (input: TypstCompileInput): Promise<TypstRenderOutput> => {
       compiler.reset();
+      const useSynchronizedFiles =
+        input.sourceFiles === undefined && synchronizedFiles !== undefined;
+      if (useSynchronizedFiles && !synchronizedShadowsApplied) {
+        compiler.reset_shadow();
+        for (const [path, contents] of synchronizedShadows) compiler.map_shadow(path, contents);
+        synchronizedShadowsApplied = true;
+      } else if (!useSynchronizedFiles && synchronizedShadowsApplied) {
+        compiler.reset_shadow();
+        synchronizedShadowsApplied = false;
+      }
       const mainFilePath = toVirtualTypstPath(input.mainPath);
-      accessModel.files = buildSourceFileMap(input, mainFilePath);
+      accessModel.files = useSynchronizedFiles
+        ? synchronizedFiles!
+        : buildSourceFileMap(input, mainFilePath);
       accessModel.dependencyPaths = new Set([mainFilePath]);
       try {
         assertObsidianTemplateImportAvailable(accessModel.files, mainFilePath, input.source);
@@ -266,6 +314,14 @@ export const createTypstEngine = async (
 };
 
 const textEncoder = new TextEncoder();
+
+const encodeSourceFiles = (sourceFiles: CompileSourceFiles): Map<string, Uint8Array> => {
+  const files = new Map<string, Uint8Array>();
+  for (const [path, source] of sourceFiles) {
+    files.set(toVirtualTypstPath(path), textEncoder.encode(source));
+  }
+  return files;
+};
 
 const buildSourceFileMap = (
   input: TypstCompileInput,

@@ -23,6 +23,11 @@ export interface LinkGraph {
   outgoing(relPath: VaultPath): readonly NoteRef[];
 }
 
+export interface LinkGraphIndex {
+  updateSource(relPath: VaultPath, source: string): void;
+  snapshot(): LinkGraph;
+}
+
 // Collapse `.` and `..` components. Returns null if the path escapes the vault root.
 function normalizePath(raw: string): string | null {
   const resolved: string[] = [];
@@ -94,17 +99,23 @@ export function buildLinkGraph(
   files: ReadonlyMap<VaultPath, string>,
   notes: readonly NoteMeta[]
 ): LinkGraph {
+  return createLinkGraphIndex(files, notes).snapshot();
+}
+
+export function createLinkGraphIndex(
+  files: ReadonlyMap<VaultPath, string>,
+  notes: readonly NoteMeta[]
+): LinkGraphIndex {
   const noteSet = new Set(notes.map((n) => n.relPath));
   const titleMap = new Map(notes.map((n) => [n.relPath, n.title]));
 
-  const edgeKeys = new Set<string>();
   const backlinksMap = new Map<VaultPath, LinkEdge[]>();
   const outgoingMap = new Map<VaultPath, LinkEdge[]>();
 
-  for (const [relPath, source] of files) {
-    // Render snapshots also contain templates and compiler dependencies. They are
-    // intentionally absent from the user navigation graph.
-    if (!noteSet.has(relPath)) continue;
+  const edgesForSource = (relPath: VaultPath, source: string): LinkEdge[] => {
+    if (!noteSet.has(relPath)) return [];
+    const edgeKeys = new Set<string>();
+    const edges: LinkEdge[] = [];
     for (const ref of parseRefs(source)) {
       const resolved = resolveNoteHref(ref.rawTarget, relPath, noteSet);
       if (resolved === null) continue;
@@ -112,15 +123,34 @@ export function buildLinkGraph(
       const key = `${relPath}\0${resolved}\0${ref.kind}`;
       if (edgeKeys.has(key)) continue;
       edgeKeys.add(key);
-
-      const edge: LinkEdge = { from: relPath, to: resolved, kind: ref.kind };
-
-      if (!backlinksMap.has(resolved)) backlinksMap.set(resolved, []);
-      backlinksMap.get(resolved)!.push(edge);
-
-      if (!outgoingMap.has(relPath)) outgoingMap.set(relPath, []);
-      outgoingMap.get(relPath)!.push(edge);
+      edges.push({ from: relPath, to: resolved, kind: ref.kind });
     }
+    return edges;
+  };
+
+  const replaceEdges = (relPath: VaultPath, nextEdges: LinkEdge[]): void => {
+    for (const edge of outgoingMap.get(relPath) ?? []) {
+      const backlinks = backlinksMap
+        .get(edge.to)
+        ?.filter(
+          (candidate) =>
+            candidate.from !== edge.from || candidate.to !== edge.to || candidate.kind !== edge.kind
+        );
+      if (backlinks && backlinks.length > 0) backlinksMap.set(edge.to, backlinks);
+      else backlinksMap.delete(edge.to);
+    }
+
+    if (nextEdges.length > 0) outgoingMap.set(relPath, nextEdges);
+    else outgoingMap.delete(relPath);
+    for (const edge of nextEdges) {
+      const backlinks = backlinksMap.get(edge.to) ?? [];
+      backlinks.push(edge);
+      backlinksMap.set(edge.to, backlinks);
+    }
+  };
+
+  for (const [relPath, source] of files) {
+    replaceEdges(relPath, edgesForSource(relPath, source));
   }
 
   const toNoteRef = (relPath: VaultPath, kind: LinkEdgeKind): NoteRef => ({
@@ -132,10 +162,17 @@ export function buildLinkGraph(
   const sortRefs = (refs: NoteRef[]): NoteRef[] =>
     refs.sort((a, b) => a.title.localeCompare(b.title) || a.relPath.localeCompare(b.relPath));
 
-  return {
+  const snapshot = (): LinkGraph => ({
     backlinks: (relPath) =>
-      sortRefs((backlinksMap.get(relPath) ?? []).map((e) => toNoteRef(e.from, e.kind))),
+      sortRefs([...(backlinksMap.get(relPath) ?? [])].map((e) => toNoteRef(e.from, e.kind))),
     outgoing: (relPath) =>
-      sortRefs((outgoingMap.get(relPath) ?? []).map((e) => toNoteRef(e.to, e.kind)))
+      sortRefs([...(outgoingMap.get(relPath) ?? [])].map((e) => toNoteRef(e.to, e.kind)))
+  });
+
+  return {
+    updateSource(relPath, source): void {
+      replaceEdges(relPath, edgesForSource(relPath, source));
+    },
+    snapshot
   };
 }

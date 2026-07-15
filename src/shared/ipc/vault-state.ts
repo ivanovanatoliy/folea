@@ -107,7 +107,12 @@ export interface ReadRenderCacheRequest {
 }
 
 export type ReadRenderCacheResponse =
-  | { readonly hit: true; readonly entry: RenderCacheEntryV1; readonly cacheKey: string }
+  | {
+      readonly hit: true;
+      readonly entry: RenderCacheEntryV1;
+      readonly cacheKey: string;
+      readonly inputFiles: readonly RenderCacheInputFile[];
+    }
   | { readonly hit: false; readonly reason: 'missing' | 'stale' | 'invalid' | 'version-mismatch' };
 
 export interface WriteRenderCacheRequest {
@@ -525,7 +530,10 @@ export const parseReadRenderCacheResponse = (value: unknown): ReadRenderCacheRes
   return {
     hit: true,
     entry: parseRenderCacheEntryV1(value.entry),
-    cacheKey: typeof value.cacheKey === 'string' ? value.cacheKey : ''
+    cacheKey: typeof value.cacheKey === 'string' ? value.cacheKey : '',
+    inputFiles: Array.isArray(value.inputFiles)
+      ? (value.inputFiles as unknown[]).map(parseRenderCacheInputFile)
+      : []
   };
 };
 

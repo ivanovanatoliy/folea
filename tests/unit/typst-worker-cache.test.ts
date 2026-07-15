@@ -109,8 +109,14 @@ describe('typst artifact cache', () => {
     const engine = new FakeTypstEngine();
     const service = new TypstCompileService(engine, new ArtifactCache(4, 'test-version'));
 
+    await service.handle({
+      type: 'syncSnapshot',
+      version: 1,
+      files: new Map([['alpha.typ', '= Alpha\n']])
+    });
+
     await expect(
-      service.handle({ type: 'prefetch', noteId: 'alpha.typ', source: '= Alpha\n' })
+      service.handle({ type: 'prefetch', noteId: 'alpha.typ', version: 1 })
     ).resolves.toMatchObject({
       type: 'prefetched',
       noteId: 'alpha.typ',
@@ -119,7 +125,7 @@ describe('typst artifact cache', () => {
     const rendered = await service.handle({
       type: 'compile',
       noteId: 'alpha.typ',
-      source: '= Alpha\n'
+      version: 1
     });
 
     expect(rendered?.type).toBe('rendered');
@@ -208,5 +214,88 @@ describe('typst artifact cache', () => {
     expect(engine.compileCount).toBe(2);
     expect(a.type === 'rendered' ? a.artifact.svg : '').toContain('a/index.typ');
     expect(b.type === 'rendered' ? b.artifact.svg : '').toContain('b/index.typ');
+  });
+
+  it('keeps one source snapshot and reports only dependency-affected notes for deltas', async () => {
+    class StatefulEngine extends FakeTypstEngine {
+      syncedSnapshots = 0;
+      appliedDeltas = 0;
+      compileInputs: TypstCompileInput[] = [];
+
+      syncSnapshot(): void {
+        this.syncedSnapshots += 1;
+      }
+
+      updateFiles(): void {
+        this.appliedDeltas += 1;
+      }
+
+      override async compile(input: TypstCompileInput): Promise<TypstRenderOutput> {
+        this.compileInputs.push(input);
+        return super.compile(input);
+      }
+    }
+
+    const engine = new StatefulEngine(() => ['alpha.typ', 'shared.typ']);
+    const service = new TypstCompileService(engine, new ArtifactCache(8, 'test-version'));
+
+    await expect(
+      service.handle({
+        type: 'syncSnapshot',
+        version: 1,
+        files: new Map([
+          ['alpha.typ', '= Alpha'],
+          ['shared.typ', '#let value = 1'],
+          ['unrelated.typ', '= Unrelated']
+        ])
+      })
+    ).resolves.toEqual({ type: 'snapshotSynced', version: 1 });
+    await service.handle({ type: 'compile', noteId: 'alpha.typ', version: 1 });
+
+    await expect(
+      service.handle({
+        type: 'updateFiles',
+        version: 2,
+        changed: new Map([['shared.typ', '#let value = 2']]),
+        deleted: []
+      })
+    ).resolves.toEqual({
+      type: 'filesUpdated',
+      version: 2,
+      affectedNoteIds: ['alpha.typ', 'shared.typ']
+    });
+    await service.handle({ type: 'compile', noteId: 'alpha.typ', version: 2 });
+
+    expect(engine.syncedSnapshots).toBe(1);
+    expect(engine.appliedDeltas).toBe(1);
+    expect(engine.compileInputs).toHaveLength(2);
+    expect(engine.compileInputs.every((input) => input.sourceFiles === undefined)).toBe(true);
+    expect(engine.compileCount).toBe(2);
+  });
+
+  it('imports dependency knowledge from persistent-cache warmup hits', async () => {
+    const service = new TypstCompileService(new FakeTypstEngine());
+    await service.handle({
+      type: 'syncSnapshot',
+      version: 1,
+      files: new Map([
+        ['alpha.typ', '= Alpha'],
+        ['shared.typ', '#let value = 1']
+      ])
+    });
+    await service.handle({
+      type: 'registerDependencies',
+      noteId: 'alpha.typ',
+      dependencies: ['alpha.typ', 'shared.typ']
+    });
+
+    await expect(
+      service.handle({
+        type: 'updateFiles',
+        version: 2,
+        changed: new Map([['shared.typ', '#let value = 2']]),
+        deleted: []
+      })
+    ).resolves.toMatchObject({ affectedNoteIds: ['alpha.typ', 'shared.typ'] });
   });
 });

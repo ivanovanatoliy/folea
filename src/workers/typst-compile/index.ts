@@ -1,4 +1,4 @@
-import { parseCompileRequest, type CompileResult } from '../../shared/worker/typst';
+import { parseCompileRequest, type TypstWorkerResult } from '../../shared/worker/typst';
 
 import { createTypstEngine } from './engine';
 import { TypstCompileService } from './service';
@@ -13,7 +13,7 @@ const getService = async (): Promise<TypstCompileService> => {
   return servicePromise;
 };
 
-const postResult = (result: CompileResult): void => {
+const postResult = (result: TypstWorkerResult): void => {
   self.postMessage(result);
 };
 
@@ -40,6 +40,12 @@ self.addEventListener('message', (event: MessageEvent<unknown>) => {
     postResult({
       type: 'error',
       noteId,
+      version:
+        typeof event.data === 'object' &&
+        event.data !== null &&
+        typeof (event.data as Record<string, unknown>).version === 'number'
+          ? ((event.data as Record<string, unknown>).version as number)
+          : 0,
       diagnostics: [
         {
           severity: 'error',

@@ -9,18 +9,32 @@ export type CompileSourceFiles = ReadonlyMap<string, string>;
 
 export type CompileRequest =
   | {
+      readonly type: 'syncSnapshot';
+      readonly version: number;
+      readonly files: CompileSourceFiles;
+    }
+  | {
+      readonly type: 'updateFiles';
+      readonly version: number;
+      readonly changed: CompileSourceFiles;
+      readonly deleted: readonly string[];
+    }
+  | {
       readonly type: 'compile';
       readonly noteId: string;
-      readonly source: string;
-      readonly sourceFiles?: CompileSourceFiles;
+      readonly version: number;
     }
   | {
       readonly type: 'prefetch';
       readonly noteId: string;
-      readonly source: string;
-      readonly sourceFiles?: CompileSourceFiles;
+      readonly version: number;
     }
-  | { readonly type: 'invalidate'; readonly noteId: string };
+  | { readonly type: 'invalidate'; readonly noteId: string }
+  | {
+      readonly type: 'registerDependencies';
+      readonly noteId: string;
+      readonly dependencies: readonly string[];
+    };
 
 export interface RenderArtifact {
   readonly svg: string;
@@ -77,6 +91,7 @@ export type CompileResult =
   | {
       readonly type: 'rendered';
       readonly noteId: string;
+      readonly version: number;
       readonly cacheKey: string;
       readonly artifact: RenderArtifact;
       readonly textLayer: TextLayerModel;
@@ -87,13 +102,24 @@ export type CompileResult =
   | {
       readonly type: 'error';
       readonly noteId: string;
+      readonly version: number;
       readonly diagnostics: readonly Diagnostic[];
     }
   | {
       readonly type: 'prefetched';
       readonly noteId: string;
+      readonly version: number;
       readonly cacheKey: string;
       readonly fromCache: boolean;
+    };
+
+export type TypstWorkerResult =
+  | CompileResult
+  | { readonly type: 'snapshotSynced'; readonly version: number }
+  | {
+      readonly type: 'filesUpdated';
+      readonly version: number;
+      readonly affectedNoteIds: readonly string[];
     };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -121,6 +147,13 @@ const parseSource = (value: unknown): string => {
   }
 
   return value;
+};
+
+const parseVersion = (value: unknown): number => {
+  if (!Number.isSafeInteger(value) || (value as number) < 0) {
+    throw new TypeError('version must be a non-negative safe integer');
+  }
+  return value as number;
 };
 
 const parseSourcePath = (value: unknown): string => {
@@ -155,11 +188,7 @@ const parseCompileSourceFile = (value: unknown): CompileSourceFile => {
   };
 };
 
-const parseCompileSourceFiles = (value: unknown): CompileSourceFiles | undefined => {
-  if (value === undefined) {
-    return undefined;
-  }
-
+const parseCompileSourceFiles = (value: unknown): CompileSourceFiles => {
   if (value instanceof Map) {
     return new Map(
       [...value.entries()].map(([path, source]) => {
@@ -190,19 +219,41 @@ export const parseCompileRequest = (value: unknown): CompileRequest => {
   }
 
   switch (value.type) {
+    case 'syncSnapshot': {
+      if (!hasOnlyKeys(value, ['type', 'version', 'files'])) {
+        throw new TypeError('Malformed Typst snapshot request');
+      }
+      return {
+        type: 'syncSnapshot',
+        version: parseVersion(value.version),
+        files: parseCompileSourceFiles(value.files)
+      };
+    }
+
+    case 'updateFiles': {
+      if (
+        !hasOnlyKeys(value, ['type', 'version', 'changed', 'deleted']) ||
+        !Array.isArray(value.deleted)
+      ) {
+        throw new TypeError('Malformed Typst file update request');
+      }
+      return {
+        type: 'updateFiles',
+        version: parseVersion(value.version),
+        changed: parseCompileSourceFiles(value.changed),
+        deleted: value.deleted.map(parseSourcePath)
+      };
+    }
+
     case 'compile':
     case 'prefetch': {
-      if (!hasOnlyKeys(value, ['type', 'noteId', 'source', 'sourceFiles'])) {
+      if (!hasOnlyKeys(value, ['type', 'noteId', 'version'])) {
         throw new TypeError('Malformed typst compile request');
       }
-
-      const sourceFiles = parseCompileSourceFiles(value.sourceFiles);
-
       return {
         type: value.type,
         noteId: parseNonEmptyString(value.noteId, 'noteId'),
-        source: parseSource(value.source),
-        ...(sourceFiles === undefined ? {} : { sourceFiles })
+        version: parseVersion(value.version)
       };
     }
 
@@ -214,6 +265,20 @@ export const parseCompileRequest = (value: unknown): CompileRequest => {
       return {
         type: 'invalidate',
         noteId: parseNonEmptyString(value.noteId, 'noteId')
+      };
+    }
+
+    case 'registerDependencies': {
+      if (
+        !hasOnlyKeys(value, ['type', 'noteId', 'dependencies']) ||
+        !Array.isArray(value.dependencies)
+      ) {
+        throw new TypeError('Malformed Typst dependency registration request');
+      }
+      return {
+        type: 'registerDependencies',
+        noteId: parseSourcePath(value.noteId),
+        dependencies: value.dependencies.map(parseSourcePath)
       };
     }
 
@@ -389,6 +454,7 @@ export const parseCompileResult = (value: unknown): CompileResult => {
         !hasOnlyKeys(value, [
           'type',
           'noteId',
+          'version',
           'cacheKey',
           'artifact',
           'textLayer',
@@ -423,6 +489,7 @@ export const parseCompileResult = (value: unknown): CompileResult => {
       return {
         type: 'rendered',
         noteId: parseNonEmptyString(value.noteId, 'noteId'),
+        version: parseVersion(value.version),
         cacheKey: parseNonEmptyString(value.cacheKey, 'cacheKey'),
         artifact: parseRenderArtifact(value.artifact),
         textLayer: parseTextLayerModel(value.textLayer),
@@ -434,7 +501,7 @@ export const parseCompileResult = (value: unknown): CompileResult => {
 
     case 'error': {
       if (
-        !hasOnlyKeys(value, ['type', 'noteId', 'diagnostics']) ||
+        !hasOnlyKeys(value, ['type', 'noteId', 'version', 'diagnostics']) ||
         !Array.isArray(value.diagnostics)
       ) {
         throw new TypeError('Malformed typst error result');
@@ -443,12 +510,13 @@ export const parseCompileResult = (value: unknown): CompileResult => {
       return {
         type: 'error',
         noteId: parseNonEmptyString(value.noteId, 'noteId'),
+        version: parseVersion(value.version),
         diagnostics: value.diagnostics.map(parseDiagnostic)
       };
     }
 
     case 'prefetched': {
-      if (!hasOnlyKeys(value, ['type', 'noteId', 'cacheKey', 'fromCache'])) {
+      if (!hasOnlyKeys(value, ['type', 'noteId', 'version', 'cacheKey', 'fromCache'])) {
         throw new TypeError('Malformed typst prefetch result');
       }
 
@@ -459,6 +527,7 @@ export const parseCompileResult = (value: unknown): CompileResult => {
       return {
         type: 'prefetched',
         noteId: parseNonEmptyString(value.noteId, 'noteId'),
+        version: parseVersion(value.version),
         cacheKey: parseNonEmptyString(value.cacheKey, 'cacheKey'),
         fromCache: value.fromCache
       };
@@ -467,6 +536,31 @@ export const parseCompileResult = (value: unknown): CompileResult => {
     default:
       throw new TypeError('Malformed typst worker result');
   }
+};
+
+export const parseTypstWorkerResult = (value: unknown): TypstWorkerResult => {
+  if (isRecord(value) && value.type === 'snapshotSynced') {
+    if (!hasOnlyKeys(value, ['type', 'version'])) {
+      throw new TypeError('Malformed Typst snapshot result');
+    }
+    return { type: 'snapshotSynced', version: parseVersion(value.version) };
+  }
+
+  if (isRecord(value) && value.type === 'filesUpdated') {
+    if (
+      !hasOnlyKeys(value, ['type', 'version', 'affectedNoteIds']) ||
+      !Array.isArray(value.affectedNoteIds)
+    ) {
+      throw new TypeError('Malformed Typst file update result');
+    }
+    return {
+      type: 'filesUpdated',
+      version: parseVersion(value.version),
+      affectedNoteIds: value.affectedNoteIds.map(parseSourcePath)
+    };
+  }
+
+  return parseCompileResult(value);
 };
 
 export const isCompileResult = (value: unknown): value is CompileResult => {

@@ -58,7 +58,10 @@ npm run format:write   # Prettier
 
 ## Workflow rules
 
-- **Run `npm run test` before committing.** Only before committing — not on every code change, not after every edit. Typechecks and linting are not required as part of the commit flow.
-- **Tests are mandatory for every change.** Write unit tests for logic and IPC contracts. Write Playwright E2E tests for every new or changed user-facing flow and every UI bug fix; these tests must use the real UI (keyboard, mouse, menus, and dialogs) and verify the visible and filesystem/state result. Direct preload/IPC calls are not a substitute for exercising the UI.
+- **Tests are mandatory to add or update for changed behavior.** Write unit tests for logic and IPC contracts. Write Playwright E2E tests for every new or changed user-facing flow and every UI bug fix; these tests must use the real UI (keyboard, mouse, menus, and dialogs) and verify the visible and filesystem/state result. Direct preload/IPC calls are not a substitute for exercising the UI.
+- **During implementation, run the smallest relevant validation target.** Use a filtered `vitest run`, `npm run test:unit:related -- <source files>`, `npm run test:unit:changed`, or a filtered `npm run test:e2e:run -- <files/options>` as appropriate.
+- **Run `npm run test` once, immediately before every commit.** Do not run the complete unit suite after ordinary edits. Do not run full typecheck, lint, build, or E2E after ordinary edits unless explicitly requested or required by changed infrastructure.
+- **Use `npm run typecheck` for fast native TypeScript checks.** `npm run typecheck:parity` retains the slower TypeScript 6 check for CI and toolchain migration verification.
+- **For review-only work, reuse recent trustworthy validation evidence.** Do not run expensive checks unless the review requires reproducing them. State any intentionally omitted checks in the final report.
 - **Commit messages and PR titles:** plain imperative, first letter capitalized, no `feat:` / `fix:` / `chore:` prefixes or any other conventional-commit prefixes. Example: `Add outline overlay keyboard navigation`.
 - **Do not add yourself as a co-author** in commit messages.

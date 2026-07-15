@@ -1,5 +1,10 @@
 import type { NotePositionState, WriteRenderCacheRequest } from '../../shared/ipc/vault-state';
-import { parseCompileResult, type CompileResult } from '../../shared/worker/typst';
+import {
+  parseTypstWorkerResult,
+  type CompileResult,
+  type CompileSourceFiles,
+  type TypstWorkerResult
+} from '../../shared/worker/typst';
 import { TYPST_COMPILER_VERSION_TAG } from '../../workers/typst-compile/cache';
 import { createTypstWorker } from '../shared/create-typst-worker';
 
@@ -79,9 +84,13 @@ export interface WarmupStatus {
 }
 
 export interface WarmupQueue {
-  start(noteRelPaths: readonly string[]): void;
+  start(version: number, sourceFiles: CompileSourceFiles, noteRelPaths: readonly string[]): void;
   cancel(): void;
   dispose(): void;
+}
+
+interface WarmupQueueOptions {
+  readonly createWorker?: () => Worker;
 }
 
 const RENDERER_VERSION = '1';
@@ -136,18 +145,19 @@ export const buildWriteCacheRequest = (
 export const createWarmupQueue = (
   onStatus: (status: WarmupStatus) => void,
   onComplete: () => void,
-  getSourceFiles: () => Promise<ReadonlyMap<string, string>>
+  onDependencies: (noteId: string, dependencies: readonly string[]) => void,
+  options: WarmupQueueOptions = {}
 ): WarmupQueue => {
   let cancelled = false;
   let worker: Worker | undefined;
-  let resolveWorkerResult: ((result: CompileResult | null) => void) | undefined;
+  let resolveWorkerResult: ((result: TypstWorkerResult | null) => void) | undefined;
 
   const ensureWorker = (): Worker => {
     if (!worker) {
-      worker = createTypstWorker();
+      worker = (options.createWorker ?? createTypstWorker)();
       worker.addEventListener('message', (event: MessageEvent<unknown>) => {
         try {
-          const result = parseCompileResult(event.data);
+          const result = parseTypstWorkerResult(event.data);
           resolveWorkerResult?.(result);
           resolveWorkerResult = undefined;
         } catch {
@@ -164,22 +174,33 @@ export const createWarmupQueue = (
     return worker;
   };
 
-  const compileNote = (
-    relPath: string,
-    source: string,
-    sourceFiles: ReadonlyMap<string, string>
-  ): Promise<CompileResult | null> => {
+  const request = (value: unknown): Promise<TypstWorkerResult | null> => {
     return new Promise((resolve) => {
       resolveWorkerResult = resolve;
-      ensureWorker().postMessage({ type: 'compile', noteId: relPath, source, sourceFiles });
+      ensureWorker().postMessage(value);
     });
   };
 
-  const run = async (noteRelPaths: readonly string[]): Promise<void> => {
+  const stopWorker = (): void => {
+    worker?.terminate();
+    worker = undefined;
+  };
+
+  const run = async (
+    version: number,
+    sourceFiles: CompileSourceFiles,
+    noteRelPaths: readonly string[]
+  ): Promise<void> => {
     const total = noteRelPaths.length;
     let done = 0;
 
     onStatus({ done, total });
+
+    const syncResult = await request({ type: 'syncSnapshot', version, files: sourceFiles });
+    if (syncResult?.type !== 'snapshotSynced' || syncResult.version !== version || cancelled) {
+      stopWorker();
+      return;
+    }
 
     let lastStatusAt = 0;
 
@@ -199,6 +220,10 @@ export const createWarmupQueue = (
         // Check if already cached
         const cacheResponse = await window.folea.vaultState.readRenderCache({ relPath });
         if (cacheResponse.hit) {
+          onDependencies(
+            relPath,
+            cacheResponse.inputFiles.map((input) => input.relPath)
+          );
           done++;
           const now = Date.now();
           if (now - lastStatusAt > WARMUP_STATUS_THROTTLE_MS) {
@@ -208,19 +233,13 @@ export const createWarmupQueue = (
           continue;
         }
 
-        // Read source and compile
-        const [source, sourceFiles] = await Promise.all([
-          window.folea.vault.read({ relPath }),
-          getSourceFiles()
-        ]);
-
-        if (cancelled) {
-          break;
-        }
-
-        const result = await compileNote(relPath, source, sourceFiles);
+        const result = await request({ type: 'compile', noteId: relPath, version });
 
         if (result && result.type === 'rendered' && !cancelled) {
+          onDependencies(
+            relPath,
+            result.inputFiles.map((input) => input.path)
+          );
           try {
             const cacheRequest = buildWriteCacheRequest(relPath, result);
             await window.folea.vaultState.writeRenderCache(cacheRequest);
@@ -243,26 +262,28 @@ export const createWarmupQueue = (
     if (!cancelled) {
       onComplete();
     }
+    stopWorker();
   };
 
   return {
-    start(noteRelPaths: readonly string[]): void {
+    start(version: number, sourceFiles: CompileSourceFiles, noteRelPaths: readonly string[]): void {
+      stopWorker();
       cancelled = false;
-      void run(noteRelPaths);
+      void run(version, sourceFiles, noteRelPaths);
     },
 
     cancel(): void {
       cancelled = true;
       resolveWorkerResult?.(null);
       resolveWorkerResult = undefined;
+      stopWorker();
     },
 
     dispose(): void {
       cancelled = true;
       resolveWorkerResult?.(null);
       resolveWorkerResult = undefined;
-      worker?.terminate();
-      worker = undefined;
+      stopWorker();
     }
   };
 };

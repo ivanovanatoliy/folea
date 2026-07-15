@@ -105,6 +105,11 @@ export class ArtifactCache {
     this.noteKeys.delete(noteId);
   }
 
+  clear(): void {
+    this.entries.clear();
+    this.noteKeys.clear();
+  }
+
   get size(): number {
     return this.entries.size;
   }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildLinkGraph } from '../../src/renderer/nav/link-graph';
+import { buildLinkGraph, createLinkGraphIndex } from '../../src/renderer/nav/link-graph';
 import type { NoteMeta, VaultPath } from '../../src/shared/ipc/vault';
 
 const meta = (relPath: VaultPath, title?: string): NoteMeta => ({
@@ -197,6 +197,22 @@ describe('buildLinkGraph — title fallback', () => {
 });
 
 describe('buildLinkGraph — rebuild reflects changes', () => {
+  it('updates one note without reparsing unchanged note sources', () => {
+    const files = new Map([
+      ['a.typ', '#link("b.typ")'],
+      ['b.typ', '#link("c.typ")'],
+      ['c.typ', '']
+    ]);
+    const index = createLinkGraphIndex(files, [meta('a.typ'), meta('b.typ'), meta('c.typ')]);
+
+    index.updateSource('a.typ', '#link("c.typ")');
+    const graph = index.snapshot();
+
+    expect(graph.outgoing('a.typ').map((ref) => ref.relPath)).toEqual(['c.typ']);
+    expect(graph.backlinks('b.typ')).toEqual([]);
+    expect(graph.backlinks('c.typ').map((ref) => ref.relPath)).toEqual(['a.typ', 'b.typ']);
+  });
+
   it('updated file set is reflected when rebuilding', () => {
     const notesArr = [meta('a.typ'), meta('b.typ'), meta('c.typ')];
 
