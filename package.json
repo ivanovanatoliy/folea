@@ -73,7 +73,7 @@
     "test:unit:related": "vitest related --run",
     "test:e2e": "npm run build && playwright test",
     "test:e2e:run": "playwright test",
-    "rebuild": "electron-rebuild",
+    "rebuild": "electron-builder install-app-deps",
     "measure:cold-start": "npm run build && node scripts/measure-cold-start.mjs",
     "measure:warm-open": "npm run build && node scripts/measure-warm-open.mjs",
     "measure:input-next-frame": "npm run build && node scripts/measure-input-to-paint.mjs",
@@ -91,7 +91,6 @@
     "solid-js": "^1.9.13"
   },
   "devDependencies": {
-    "@electron/rebuild": "^4.0.4",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.61.0",
     "@types/node": "^24.0.0",
