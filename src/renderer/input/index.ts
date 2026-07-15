@@ -3,7 +3,7 @@ export { normalizeChord } from './keys';
 
 export type { Keymap } from './keymap';
 
-export type { ContextEntry, ContextStack } from './context-stack';
+export type { ContextEntry, ContextStack, InputContextName } from './context-stack';
 export { createContextStack } from './context-stack';
 
 export type {

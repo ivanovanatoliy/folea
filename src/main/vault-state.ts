@@ -21,6 +21,8 @@ import {
   type RenderCacheManifestEntry
 } from '../shared/ipc/vault-state';
 import type { VaultPath } from '../shared/ipc/vault';
+import { FOLEA_RENDERER_VERSION, TYPST_COMPILER_VERSION_TAG } from '../shared/build-identity';
+import { atomicWriteJson, atomicWriteString, readJsonFile } from './persistence/atomic-file';
 import { isNodeError } from './vault/paths';
 
 const FOLEA_DIR = '.folea';
@@ -31,61 +33,6 @@ const ENTRIES_DIR = 'entries';
 
 const RENDER_CACHE_MAX_ENTRIES = 500;
 const RENDER_CACHE_MAX_BYTES = 250 * 1024 * 1024;
-const RENDERER_VERSION = '1';
-const COMPILER_VERSION = 'typst.ts@0.7.0';
-
-// ── Atomic write helper ────────────────────────────────────────────────────────
-
-const atomicWriteJson = async (filePath: string, data: unknown): Promise<void> => {
-  const dir = path.dirname(filePath);
-  const tmpPath = path.join(
-    dir,
-    `${path.basename(filePath)}.tmp-${process.pid}-${crypto.randomBytes(4).toString('hex')}`
-  );
-  const json = JSON.stringify(data, null, 2);
-
-  try {
-    await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(tmpPath, json, 'utf8');
-    await fs.rename(tmpPath, filePath);
-  } catch (error) {
-    try {
-      await fs.unlink(tmpPath);
-    } catch {
-      // best-effort cleanup
-    }
-
-    throw error;
-  }
-};
-
-const atomicWriteString = async (filePath: string, content: string): Promise<void> => {
-  const dir = path.dirname(filePath);
-  const tmpPath = path.join(
-    dir,
-    `${path.basename(filePath)}.tmp-${process.pid}-${crypto.randomBytes(4).toString('hex')}`
-  );
-
-  try {
-    await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(tmpPath, content, 'utf8');
-    await fs.rename(tmpPath, filePath);
-  } catch (error) {
-    try {
-      await fs.unlink(tmpPath);
-    } catch {
-      // best-effort cleanup
-    }
-
-    throw error;
-  }
-};
-
-const readJsonFile = async (filePath: string): Promise<unknown> => {
-  const content = await fs.readFile(filePath, 'utf8');
-  return JSON.parse(content) as unknown;
-};
-
 // ── Paths ──────────────────────────────────────────────────────────────────────
 
 const getFoleaDir = (vaultRoot: string): string => path.join(vaultRoot, FOLEA_DIR);
@@ -352,7 +299,9 @@ export const readRenderCache = async (
   }
 
   const versionMatches = candidates.filter(
-    (e) => e.rendererVersion === RENDERER_VERSION && e.compilerVersion === COMPILER_VERSION
+    (e) =>
+      e.rendererVersion === FOLEA_RENDERER_VERSION &&
+      e.compilerVersion === TYPST_COMPILER_VERSION_TAG
   );
 
   if (versionMatches.length === 0) {

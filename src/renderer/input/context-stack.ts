@@ -1,7 +1,21 @@
 import type { Keymap } from './keymap';
 
+export type InputContextName =
+  | 'document'
+  | 'caret'
+  | 'visual'
+  | 'tree'
+  | 'tree-search'
+  | 'palette'
+  | 'search'
+  | 'outline'
+  | 'links'
+  | 'quick-open'
+  | 'templates'
+  | 'vault-dialog';
+
 export interface ContextEntry {
-  readonly name: string;
+  readonly name: InputContextName;
   readonly keymap: Keymap;
 }
 

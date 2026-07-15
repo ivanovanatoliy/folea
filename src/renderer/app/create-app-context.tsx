@@ -51,6 +51,7 @@ import type {
   CommandContext,
   DocumentView,
   EditorView,
+  InputContextName,
   LinksView,
   OutlineView,
   PaletteView,
@@ -182,7 +183,7 @@ export const AppRuntime = () => {
     return notes().find((n) => n.relPath === relPath)?.basename ?? '';
   });
   const [vaultStatus, setVaultStatus] = createSignal('no vault');
-  const [activeContext, setActiveContext] = createSignal('document');
+  const [activeContext, setActiveContext] = createSignal<InputContextName>('document');
   const [currentSource, setCurrentSource] = createSignal('');
   const [paletteQuery, setPaletteQuery] = createSignal('');
   const [paletteSelectedIndex, setPaletteSelectedIndex] = createSignal(0);
@@ -218,7 +219,7 @@ export const AppRuntime = () => {
   const [managedTemplates, setManagedTemplates] = createSignal<readonly VaultTemplate[]>([]);
   const [selectedTemplateIndex, setSelectedTemplateIndex] = createSignal(0);
   const [vaultDialogRequest, setVaultDialogRequest] = createSignal<VaultOperationDialogRequest>();
-  const [vaultDialogParentContext, setVaultDialogParentContext] = createSignal<string>();
+  const [vaultDialogParentContext, setVaultDialogParentContext] = createSignal<InputContextName>();
   const [operationNotice, setOperationNotice] = createSignal<OperationNoticeValue>();
   const [treeContextMenuOpen, setTreeContextMenuOpen] = createSignal(false);
   const [templateContextMenuOpen, setTemplateContextMenuOpen] = createSignal(false);
@@ -806,12 +807,12 @@ export const AppRuntime = () => {
     }
 
     const contextStack = createContextStack();
-    const pushContext = (name: string, keymap: Keymap): void => {
+    const pushContext = (name: InputContextName, keymap: Keymap): void => {
       if (contextStack.active()?.name === name) return;
       contextStack.push({ name, keymap });
       setActiveContext(contextStack.active()?.name ?? 'document');
     };
-    const popContext = (name: string): void => {
+    const popContext = (name: InputContextName): void => {
       if (contextStack.active()?.name === name) {
         contextStack.pop();
       }

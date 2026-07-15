@@ -1,7 +1,8 @@
 import type { OutlineEntry, RenderArtifact, TextLayerModel } from '../../shared/worker/typst';
+import { TYPST_COMPILER_VERSION_TAG } from '../../shared/build-identity';
 
 export const ARTIFACT_CACHE_CAPACITY = 32;
-export const TYPST_COMPILER_VERSION_TAG = 'typst.ts@0.7.0';
+export { TYPST_COMPILER_VERSION_TAG } from '../../shared/build-identity';
 
 export interface CachedRender {
   readonly artifact: RenderArtifact;

@@ -5,7 +5,7 @@ import {
   type CompileSourceFiles,
   type TypstWorkerResult
 } from '../../shared/worker/typst';
-import { TYPST_COMPILER_VERSION_TAG } from '../../workers/typst-compile/cache';
+import { FOLEA_RENDERER_VERSION, TYPST_COMPILER_VERSION_TAG } from '../../shared/build-identity';
 import { createTypstWorker } from '../shared/create-typst-worker';
 
 export const POSITION_DEBOUNCE_MS = 500;
@@ -93,8 +93,6 @@ interface WarmupQueueOptions {
   readonly createWorker?: () => Worker;
 }
 
-const RENDERER_VERSION = '1';
-
 export const buildWriteCacheRequest = (
   relPath: string,
   result: Extract<CompileResult, { type: 'rendered' }>
@@ -121,7 +119,7 @@ export const buildWriteCacheRequest = (
     cacheKey: result.cacheKey,
     relPath,
     entryPath: `${result.cacheKey}.json`,
-    rendererVersion: RENDERER_VERSION,
+    rendererVersion: FOLEA_RENDERER_VERSION,
     compilerVersion: TYPST_COMPILER_VERSION_TAG,
     inputHash: sortedHashes,
     inputFiles,
