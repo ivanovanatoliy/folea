@@ -117,6 +117,8 @@ const makeContext = (links: LinksView): CommandContext => ({
     moveUp: vi.fn(),
     collapse: vi.fn(),
     expand: vi.fn(),
+    collapseAll: vi.fn(),
+    expandAll: vi.fn(),
     close: vi.fn(),
     openSearch: vi.fn(),
     closeSearch: vi.fn(),

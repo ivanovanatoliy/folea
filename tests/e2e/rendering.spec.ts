@@ -148,12 +148,12 @@ test('opens a configured vault, lists notes, and renders the selected note', asy
     const localSearchScrollBefore = await page
       .getByTestId('typst-surface')
       .evaluate((el) => el.scrollTop);
-    await page.keyboard.type('Detail line 30');
-    await expect(page.getByTestId('search-input')).toHaveValue('Detail line 30');
+    await page.keyboard.type('Detail line');
+    await expect(page.getByTestId('search-input')).toHaveValue('Detail line');
     await expect.poll(() => page.getByTestId('search-row').count()).toBeGreaterThan(0);
     await expect(page.getByTestId('search-overlay')).toContainText('alpha.typ');
     await expect(page.getByTestId('search-overlay')).not.toContainText('nested/beta.typ');
-    await page.keyboard.press('Enter');
+    await page.getByTestId('search-row').nth(29).click();
     await expect(page.getByTestId('statusline-mode')).toHaveText('[document]');
     await expect(page.getByTestId('surface-search-highlight')).toHaveCount(1);
     await page.waitForFunction(

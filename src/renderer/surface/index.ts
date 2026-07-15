@@ -54,6 +54,8 @@ export interface SurfaceSearchTarget {
   readonly query: string;
   readonly line?: number;
   readonly preview?: string;
+  readonly previewOccurrence?: number;
+  readonly queryOccurrence?: number;
 }
 
 export interface SurfaceController {

@@ -15,6 +15,43 @@
     monospace;
 }
 
+.tree-header-tools {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tree-header-button {
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--folea-muted);
+  cursor: pointer;
+}
+
+.tree-header-button:hover,
+.tree-header-button:focus-visible {
+  background: var(--folea-highlight);
+  color: var(--folea-highlight-text);
+  outline: none;
+}
+
+.tree-header-button svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .tree-scroll {
   min-height: 0;
   overflow: auto;

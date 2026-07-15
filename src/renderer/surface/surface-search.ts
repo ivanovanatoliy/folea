@@ -14,6 +14,33 @@ export interface SurfaceSearchController {
   reapplyHighlight(): void;
 }
 
+export const findSearchTargetIndex = (
+  texts: readonly string[],
+  target: {
+    readonly query: string;
+    readonly preview?: string;
+    readonly previewOccurrence?: number;
+    readonly queryOccurrence?: number;
+  }
+): number => {
+  const previewNeedle = normalizeSearchText(stripTypstMarkup(target.preview ?? ''));
+  if (previewNeedle.length > 0) {
+    const previewMatches = texts
+      .map((text, index) => ({ text: normalizeSearchText(text), index }))
+      .filter((entry) => entry.text.includes(previewNeedle));
+    if (previewMatches.length > 0) {
+      return previewMatches[Math.min(target.previewOccurrence ?? 0, previewMatches.length - 1)]!
+        .index;
+    }
+  }
+
+  const queryNeedle = normalizeSearchText(target.query);
+  const queryMatches = texts
+    .map((text, index) => ({ text: normalizeSearchText(text), index }))
+    .filter((entry) => entry.text.includes(queryNeedle));
+  return queryMatches[Math.min(target.queryOccurrence ?? 0, queryMatches.length - 1)]?.index ?? -1;
+};
+
 export const createSurfaceSearch = (
   container: HTMLElement,
   emitPageStatus: () => void
@@ -99,15 +126,10 @@ export const createSurfaceSearch = (
     revealTarget(target): boolean {
       query = target.query.trim();
       if (!query) return false;
-      const needles = [
-        normalizeSearchText(stripTypstMarkup(target.preview ?? '')),
-        normalizeSearchText(query),
-        normalizeSearchText((target.preview ?? '').replace(/^=+\s*/, ''))
-      ].filter((needle) => needle.length > 0);
-      const index = textSpans.findIndex((span) => {
-        const text = normalizeSearchText(span.textContent ?? '');
-        return needles.some((needle) => text.includes(needle));
-      });
+      const index = findSearchTargetIndex(
+        textSpans.map((span) => span.textContent ?? ''),
+        target
+      );
       if (index < 0 || !setHighlight(index)) {
         clearHighlight();
         return false;

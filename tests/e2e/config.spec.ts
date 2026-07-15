@@ -21,6 +21,11 @@ test('loads theme and key remaps from config files', async () => {
       FOLEA_TEST_USER_DATA_DIR: userDataRoot
     });
     const page = await app.firstWindow();
+    await expect
+      .poll(() =>
+        app.evaluate(({ app: electronApp }) => electronApp.isHardwareAccelerationEnabled())
+      )
+      .toBe(false);
 
     await expect(page.locator(':root')).toHaveAttribute('data-theme', 'dark');
     await expectSurfaceRendered(page);

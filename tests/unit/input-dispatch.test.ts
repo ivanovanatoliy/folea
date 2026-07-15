@@ -66,6 +66,8 @@ const makeTreeView = () => {
   const moveUp = vi.fn();
   const collapse = vi.fn();
   const expand = vi.fn();
+  const collapseAll = vi.fn();
+  const expandAll = vi.fn();
   const close = vi.fn();
   const openSelection = vi.fn();
   const toggleOverlay = vi.fn();
@@ -80,6 +82,8 @@ const makeTreeView = () => {
     moveUp,
     collapse,
     expand,
+    collapseAll,
+    expandAll,
     close,
     openSearch,
     closeSearch,
@@ -94,6 +98,8 @@ const makeTreeView = () => {
     view,
     moveDown,
     moveUp,
+    collapseAll,
+    expandAll,
     collapse,
     expand,
     close,
@@ -307,6 +313,86 @@ describe('chord normalization', () => {
     expect(normalizeChord({ key: 'G', ctrlKey: false, altKey: false, metaKey: false })).toBe('G');
   });
 
+  it('uses the physical letter key on a non-Latin layout', () => {
+    expect(
+      normalizeChord({
+        key: 'о',
+        code: 'KeyJ',
+        ctrlKey: false,
+        altKey: false,
+        metaKey: false
+      })
+    ).toBe('j');
+  });
+
+  it('uses physical Shift+letter casing on a non-Latin layout', () => {
+    expect(
+      normalizeChord({
+        key: 'Я',
+        code: 'KeyZ',
+        ctrlKey: false,
+        altKey: false,
+        metaKey: false,
+        shiftKey: true
+      })
+    ).toBe('Z');
+  });
+
+  it('honors an uppercase physical key even when an automation event omits shiftKey', () => {
+    expect(
+      normalizeChord({
+        key: 'M',
+        code: 'KeyM',
+        ctrlKey: false,
+        altKey: false,
+        metaKey: false
+      })
+    ).toBe('M');
+  });
+
+  it('uses the physical key for control chords on a non-Latin layout', () => {
+    expect(
+      normalizeChord({
+        key: 'и',
+        code: 'KeyB',
+        ctrlKey: true,
+        altKey: false,
+        metaKey: false
+      })
+    ).toBe('<C-b>');
+  });
+
+  it('maps physical punctuation and shifted digits to US shortcut labels', () => {
+    expect(
+      normalizeChord({
+        key: '.',
+        code: 'Slash',
+        ctrlKey: false,
+        altKey: false,
+        metaKey: false
+      })
+    ).toBe('/');
+    expect(
+      normalizeChord({
+        key: '%',
+        code: 'Digit5',
+        ctrlKey: false,
+        altKey: false,
+        metaKey: false,
+        shiftKey: true
+      })
+    ).toBe('%');
+    expect(
+      normalizeChord({
+        key: ':',
+        code: 'Semicolon',
+        ctrlKey: false,
+        altKey: false,
+        metaKey: false
+      })
+    ).toBe(':');
+  });
+
   it('ctrl chord', () => {
     expect(normalizeChord({ key: 'd', ctrlKey: true, altKey: false, metaKey: false })).toBe(
       '<C-d>'
@@ -388,6 +474,19 @@ describe('headless dispatch — tree commands', () => {
     expect(tree.selectLast).toHaveBeenCalledOnce();
   });
 
+  it('tree zM and zR collapse and expand all folders', () => {
+    const { stack, tree, dispatcher } = makeSetup();
+    stack.push({ name: 'tree', keymap: TREE_KEYMAP });
+
+    expect(dispatcher.dispatch('z')).toBe('pending');
+    expect(dispatcher.dispatch('M')).toBe('handled');
+    expect(dispatcher.dispatch('z')).toBe('pending');
+    expect(dispatcher.dispatch('R')).toBe('handled');
+
+    expect(tree.collapseAll).toHaveBeenCalledOnce();
+    expect(tree.expandAll).toHaveBeenCalledOnce();
+  });
+
   it('<C-b> global toggles tree from document and tree contexts', () => {
     const { stack, tree, dispatcher } = makeSetup();
 
@@ -422,11 +521,13 @@ describe('headless dispatch — tree commands', () => {
     const { stack, tree, dispatcher } = makeSetup();
     stack.push({ name: 'tree-search', keymap: TREE_SEARCH_KEYMAP });
 
-    expect(dispatcher.dispatch('a')).toBe('handled');
+    expect(dispatcher.dispatch('a', 'ф')).toBe('handled');
+    expect(dispatcher.dispatch('*', '*')).toBe('handled');
     expect(dispatcher.dispatch('Backspace')).toBe('handled');
     expect(dispatcher.dispatch('Escape')).toBe('handled');
 
-    expect(tree.appendSearchChar).toHaveBeenCalledWith('a');
+    expect(tree.appendSearchChar).toHaveBeenCalledWith('ф');
+    expect(tree.appendSearchChar).toHaveBeenCalledWith('*');
     expect(tree.backspaceSearch).toHaveBeenCalledOnce();
     expect(tree.closeSearch).toHaveBeenCalledOnce();
   });
@@ -567,9 +668,9 @@ describe('headless dispatch — caret and visual commands', () => {
     expect(dispatcher.dispatch('n')).toBe('handled');
     expect(dispatcher.dispatch('N')).toBe('handled');
     expect(dispatcher.dispatch('m')).toBe('pending');
-    expect(dispatcher.dispatch('a')).toBe('handled');
+    expect(dispatcher.dispatch('a', 'ф')).toBe('handled');
     expect(dispatcher.dispatch("'")).toBe('pending');
-    expect(dispatcher.dispatch('b')).toBe('handled');
+    expect(dispatcher.dispatch('b', 'и')).toBe('handled');
 
     expect(caret.moveDown).toHaveBeenCalledOnce();
     expect(caret.moveUp).toHaveBeenCalledOnce();

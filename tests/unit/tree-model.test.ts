@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   buildTree,
   calculateVirtualWindow,
+  collectFolderPaths,
   flattenTree,
+  getFolderAncestors,
   pruneTreeMarks,
   toggleTreeMark
 } from '../../src/renderer/app/tree-model';
@@ -84,6 +86,13 @@ describe('tree model', () => {
       'parent',
       'parent/child'
     ]);
+  });
+
+  it('collects every folder and resolves the ancestors of a note', () => {
+    const tree = buildTree([note('projects/nested/beta.typ'), note('archive/old.typ')]);
+
+    expect(collectFolderPaths(tree)).toEqual(['archive', 'projects', 'projects/nested']);
+    expect(getFolderAncestors('projects/nested/beta.typ')).toEqual(['projects', 'projects/nested']);
   });
 
   it('bounds the virtual row window independent of total row count', () => {

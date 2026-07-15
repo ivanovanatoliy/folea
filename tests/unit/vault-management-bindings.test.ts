@@ -11,6 +11,8 @@ describe('vault management bindings', () => {
     expect(TREE_KEYMAP.get('mu')).toBe('tree.clearMarks');
     expect(TREE_KEYMAP.get('mm')).toBe('tree.moveMarks');
     expect(TREE_KEYMAP.get('D')).toBe('tree.delete');
+    expect(TREE_KEYMAP.get('zM')).toBe('tree.collapseAll');
+    expect(TREE_KEYMAP.get('zR')).toBe('tree.expandAll');
     expect(GLOBAL_KEYMAP.get('<C-n>')).toBe('tree.createNoteAtCurrent');
     expect(TEMPLATES_KEYMAP.get('R')).toBe('templates.rename');
     expect(TEMPLATES_KEYMAP.get('D')).toBe('templates.delete');

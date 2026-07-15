@@ -57,7 +57,13 @@ test('creates notes and directories through the real tree UI and dismisses its c
       )
       .toBe('');
     await expect(page.getByTestId('statusline-doc')).toHaveText('keyboard-note.typ');
+    await expect(page.getByTestId('tree-overlay')).toHaveCount(0);
+
+    await page.keyboard.press('Control+b');
     await expect(page.getByTestId('tree-overlay')).toContainText('keyboard-note.typ');
+    await expect(
+      page.locator('[data-testid="tree-row"][data-relpath="keyboard-note.typ"]')
+    ).toHaveAttribute('data-selected', 'true');
 
     await page.keyboard.press('d');
     await expect(page.getByTestId('vault-operation-dialog')).toHaveAttribute(
@@ -101,7 +107,9 @@ test('creates notes and directories through the real tree UI and dismisses its c
       'Created from template'
     );
     await expect(page.getByTestId('typst-rendered-document')).toContainText('Template helper');
+    await expect(page.getByTestId('tree-overlay')).toHaveCount(0);
 
+    await page.keyboard.press('Control+b');
     await keyboardFolderRow.click({ button: 'right' });
     await page.getByRole('button', { name: 'create note', exact: true }).click();
     await page.getByTestId('vault-dialog-input').fill('context-note');
@@ -173,6 +181,72 @@ test('creates notes and directories through the real tree UI and dismisses its c
     await expect(page.getByTestId('tree-context-menu')).toHaveCount(0);
     await expect(page.getByTestId('tree-overlay')).toHaveCount(0);
     expect(nativeDialogs).toEqual([]);
+  } finally {
+    await fs.rm(vaultRoot, { recursive: true, force: true });
+  }
+});
+
+test('focuses the current note and expands or collapses all tree folders', async () => {
+  const vaultRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'folea-e2e-tree-folds-'));
+  await fs.mkdir(path.join(vaultRoot, 'projects', 'nested'), { recursive: true });
+  await fs.writeFile(
+    path.join(vaultRoot, 'projects', 'nested', 'current.typ'),
+    '= Current\n',
+    'utf8'
+  );
+  await fs.writeFile(path.join(vaultRoot, 'root.typ'), '= Root\n', 'utf8');
+
+  try {
+    const app = await launchApp({
+      ...currentEnv(),
+      FOLEA_ALLOW_TEST_VAULT_OPEN: '1',
+      FOLEA_TEST_VAULT_PATH: vaultRoot
+    });
+    const page = await app.firstWindow();
+    await expectSurfaceRendered(page);
+    await expect(page.getByTestId('statusline-doc')).toHaveText('current.typ');
+
+    const currentRow = page.locator(
+      '[data-testid="tree-row"][data-relpath="projects/nested/current.typ"]'
+    );
+    const clickTreeHeaderButton = async (
+      testId: 'tree-collapse-all' | 'tree-expand-all'
+    ): Promise<void> => {
+      const box = await page.getByTestId(testId).boundingBox();
+      if (!box) throw new Error(`${testId} is not visible`);
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    };
+    await page.keyboard.press('Control+b');
+    await expect(currentRow).toHaveAttribute('data-selected', 'true');
+    await expect(page.getByTestId('tree-collapse-all')).toHaveAttribute(
+      'title',
+      'Collapse all folders (zM)'
+    );
+    await expect(page.getByTestId('tree-expand-all')).toHaveAttribute(
+      'title',
+      'Expand all folders (zR)'
+    );
+
+    await clickTreeHeaderButton('tree-collapse-all');
+    await expect(currentRow).toHaveCount(0);
+    await expect(
+      page.locator('[data-testid="tree-row"][data-relpath="projects/nested"]')
+    ).toHaveCount(0);
+
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Control+b');
+    await expect(currentRow).toHaveAttribute('data-selected', 'true');
+
+    await page.keyboard.press('z');
+    await page.keyboard.press('M');
+    await expect(currentRow).toHaveCount(0);
+    await page.keyboard.press('z');
+    await page.keyboard.press('R');
+    await expect(currentRow).toHaveAttribute('data-selected', 'true');
+
+    await clickTreeHeaderButton('tree-collapse-all');
+    await clickTreeHeaderButton('tree-expand-all');
+    await expect(currentRow).toHaveAttribute('data-selected', 'true');
   } finally {
     await fs.rm(vaultRoot, { recursive: true, force: true });
   }

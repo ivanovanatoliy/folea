@@ -34,7 +34,7 @@ const hasPrefix = (accum: string, contextKeymap: Keymap, globalKeymap: Keymap): 
   prefixesFor(contextKeymap).has(accum) || prefixesFor(globalKeymap).has(accum);
 
 export interface Dispatcher {
-  dispatch(chord: string): DispatchResult;
+  dispatch(chord: string, text?: string): DispatchResult;
 }
 
 export const createDispatcher = (
@@ -45,13 +45,15 @@ export const createDispatcher = (
   const buffer = createSequenceBuffer();
 
   return {
-    dispatch(chord: string): DispatchResult {
+    dispatch(chord: string, text?: string): DispatchResult {
       const active = contextStack.active();
       const contextKeymap: Keymap = active?.keymap ?? EMPTY_KEYMAP;
 
       const accum = buffer.get() + chord;
 
-      const commandId = contextKeymap.get(accum) ?? globalKeymap.get(accum);
+      const commandId = accum.includes('*')
+        ? undefined
+        : (contextKeymap.get(accum) ?? globalKeymap.get(accum));
       if (commandId !== undefined) {
         const command = getCommand(commandId);
         if (command !== undefined) {
@@ -103,7 +105,7 @@ export const createDispatcher = (
           }
 
           buffer.clear();
-          const result = wildcardCommand.run(getContext(), chord);
+          const result = wildcardCommand.run(getContext(), text ?? chord);
           if (result === false) {
             return 'unhandled';
           }

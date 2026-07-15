@@ -7,6 +7,10 @@ import {
   installTypstWorkerProtocol
 } from './window';
 
+if (process.env.FOLEA_DISABLE_HARDWARE_ACCELERATION === '1') {
+  app.disableHardwareAcceleration();
+}
+
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'folea-worker',

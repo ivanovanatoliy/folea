@@ -34,6 +34,8 @@ export const TREE_KEYMAP: Keymap = new Map([
   ['ArrowLeft', 'tree.collapse'],
   ['l', 'tree.expand'],
   ['h', 'tree.collapse'],
+  ['zM', 'tree.collapseAll'],
+  ['zR', 'tree.expandAll'],
   ['gg', 'tree.selectFirst'],
   ['G', 'tree.selectLast'],
   ['/', 'tree.openSearch'],

@@ -159,6 +159,20 @@ export const getParentFolderPath = (relPath: string): string | undefined => {
   return lastSlash > 0 ? relPath.slice(0, lastSlash) : undefined;
 };
 
+export const getFolderAncestors = (relPath: string): readonly string[] => {
+  const parts = relPath.split('/').slice(0, -1);
+  return parts.map((_, index) => parts.slice(0, index + 1).join('/'));
+};
+
+export const collectFolderPaths = (nodes: readonly TreeNode[]): readonly string[] => {
+  const paths: string[] = [];
+  for (const node of nodes) {
+    if (node.kind !== 'folder') continue;
+    paths.push(node.relPath, ...collectFolderPaths(node.children));
+  }
+  return paths;
+};
+
 export const calculateVirtualWindow = (
   rowCount: number,
   scrollTop: number,

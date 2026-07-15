@@ -5,6 +5,16 @@ registerCommand({ id: 'tree.moveUp', title: 'Tree up', run: (ctx) => ctx.tree.mo
 registerCommand({ id: 'tree.expand', title: 'Tree expand', run: (ctx) => ctx.tree.expand() });
 registerCommand({ id: 'tree.collapse', title: 'Tree collapse', run: (ctx) => ctx.tree.collapse() });
 registerCommand({
+  id: 'tree.collapseAll',
+  title: 'Collapse all tree folders',
+  run: (ctx) => ctx.tree.collapseAll()
+});
+registerCommand({
+  id: 'tree.expandAll',
+  title: 'Expand all tree folders',
+  run: (ctx) => ctx.tree.expandAll()
+});
+registerCommand({
   id: 'tree.openSearch',
   title: 'Search tree',
   run: (ctx) => ctx.tree.openSearch()

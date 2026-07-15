@@ -5,12 +5,15 @@ import { TREE_ROW_HEIGHT, calculateVirtualWindow, type TreeRow } from './tree-mo
 interface TreeOverlayProps {
   readonly visible: boolean;
   readonly rows: readonly TreeRow[];
+  readonly noteCount: number;
   readonly selectedIndex: number;
   readonly searchQuery?: string;
   readonly searchActive?: boolean;
   readonly onRowClick?: (index: number) => void;
   readonly marks?: ReadonlySet<string>;
   readonly onCloseRequest?: () => void;
+  readonly onCollapseAll?: () => void;
+  readonly onExpandAll?: () => void;
   readonly onContextMenuVisibilityChange?: (visible: boolean) => void;
   readonly registerContextMenuDismiss?: (dismiss: () => void) => void;
   readonly onAction?: (
@@ -156,7 +159,35 @@ export const TreeOverlay = (props: TreeOverlayProps) => {
           }}
         >
           <span>vault</span>
-          <span>{props.rows.length} rows</span>
+          <div class="tree-header-tools">
+            <span>
+              {props.noteCount} {props.noteCount === 1 ? 'note' : 'notes'}
+            </span>
+            <button
+              type="button"
+              class="tree-header-button"
+              data-testid="tree-collapse-all"
+              aria-label="Collapse all folders"
+              title="Collapse all folders (zM)"
+              onClick={() => props.onCollapseAll?.()}
+            >
+              <svg viewBox="0 0 14 14" aria-hidden="true">
+                <path d="m3 1.5 4 4 4-4M3 12.5l4-4 4 4" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="tree-header-button"
+              data-testid="tree-expand-all"
+              aria-label="Expand all folders"
+              title="Expand all folders (zR)"
+              onClick={() => props.onExpandAll?.()}
+            >
+              <svg viewBox="0 0 14 14" aria-hidden="true">
+                <path d="m3 5.5 4-4 4 4M3 8.5l4 4 4-4" />
+              </svg>
+            </button>
+          </div>
         </div>
         <div
           ref={(element) => {

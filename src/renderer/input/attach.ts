@@ -2,7 +2,7 @@ import type { DispatchResult } from './commands';
 import { normalizeChord } from './keys';
 
 interface Dispatcher {
-  dispatch(chord: string): DispatchResult;
+  dispatch(chord: string, text?: string): DispatchResult;
 }
 
 const isKeyboardEvent = (event: Event): event is KeyboardEvent => 'key' in event;
@@ -43,7 +43,7 @@ export const attachKeyListener = (
       return;
     }
 
-    const result = dispatcher.dispatch(chord);
+    const result = dispatcher.dispatch(chord, event.key.length === 1 ? event.key : undefined);
     if (result === 'handled' || result === 'pending') {
       event.preventDefault();
     }

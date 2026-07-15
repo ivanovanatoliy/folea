@@ -14,7 +14,9 @@ import { TemplateManagerOverlay } from './TemplateManagerOverlay';
 import {
   buildTree,
   clampTreeIndex,
+  collectFolderPaths,
   flattenTree,
+  getFolderAncestors,
   getParentFolderPath,
   pruneTreeMarks,
   toggleTreeMark,
@@ -254,6 +256,9 @@ export const AppRuntime = () => {
   ) => void = () => {};
   let treeDrop: (source: string, index?: number) => void = () => {};
   let treeCloseRequest: () => void = () => {};
+  let treeCollapseAllRequest: () => void = () => {};
+  let treeExpandAllRequest: () => void = () => {};
+  let closeTreeAfterNoteCreation: () => void = () => {};
   let openTemplateManagerContext: () => void = () => {};
   let quickOpenInputHandler: (query: string) => void = () => {};
   let quickOpenAcceptRow: (index: number) => void = () => {};
@@ -338,6 +343,22 @@ export const AppRuntime = () => {
   const selectedTreeRow = createMemo<TreeRow | undefined>(
     () => visibleTreeRows()[clampTreeIndex(selectedTreeIndex(), visibleTreeRows())]
   );
+
+  const focusCurrentNoteInTree = (): void => {
+    const relPath = selectedRelPath();
+    if (!relPath) {
+      setSelectedTreeIndex(0);
+      return;
+    }
+
+    const ancestors = new Set(getFolderAncestors(relPath));
+    setCollapsedFolders((current) => {
+      const next = new Set([...current].filter((folder) => !ancestors.has(folder)));
+      return next.size === current.size ? current : next;
+    });
+    const index = treeRows().findIndex((row) => row.kind === 'note' && row.relPath === relPath);
+    if (index >= 0) setSelectedTreeIndex(index);
+  };
   const paletteMatches = createMemo(() =>
     filterPaletteCommands(listPaletteCommands(), paletteQuery(), commandHistory())
   );
@@ -685,7 +706,8 @@ export const AppRuntime = () => {
     selectNote,
     openTemplateManager: openTemplateManagerContext,
     reportError: reportOperationError,
-    reportWarnings: reportOperationWarnings
+    reportWarnings: reportOperationWarnings,
+    onNoteCreated: () => closeTreeAfterNoteCreation()
   });
   const createNoteFlow = vaultOperations.createNote;
   const createDirectoryFlow = vaultOperations.createDirectory;
@@ -990,6 +1012,17 @@ export const AppRuntime = () => {
 
         setSelectedTreeIndex((index) => clampTreeIndex(index + 1, treeRows()));
       },
+      collapseAll: () => {
+        setCollapsedFolders(new Set(collectFolderPaths(treeRoot())));
+        const relPath = selectedRelPath();
+        const targetPath = relPath.includes('/') ? relPath.split('/')[0]! : relPath;
+        const targetIndex = treeRows().findIndex((row) => row.relPath === targetPath);
+        setSelectedTreeIndex(Math.max(0, targetIndex));
+      },
+      expandAll: () => {
+        setCollapsedFolders(new Set<string>());
+        focusCurrentNoteInTree();
+      },
       openSelection: () => {
         const row = selectedTreeRow();
         if (!row) return;
@@ -1013,6 +1046,7 @@ export const AppRuntime = () => {
           popContext('tree-search');
           popContext('tree');
         } else {
+          focusCurrentNoteInTree();
           pushContext('tree', keymaps.tree);
         }
       },
@@ -1132,7 +1166,9 @@ export const AppRuntime = () => {
         ),
       movePrevious: () => setSearchSelectedIndex((index) => Math.max(0, index - 1)),
       accept: (index?: number) => {
-        const hit = searchHits()[index ?? searchSelectedIndex()];
+        const selectedIndex = index ?? searchSelectedIndex();
+        const hits = searchHits();
+        const hit = hits[selectedIndex];
         const targetQuery = searchQuery().trim();
         window.folea.search.cancel();
         popContext('search');
@@ -1143,7 +1179,22 @@ export const AppRuntime = () => {
             relPath: hit.relPath,
             query: targetQuery,
             line: hit.line,
-            preview: hit.preview
+            preview: hit.preview,
+            previewOccurrence: new Set(
+              hits
+                .slice(0, selectedIndex)
+                .filter(
+                  (candidate) =>
+                    candidate.relPath === hit.relPath && candidate.preview === hit.preview
+                )
+                .map((candidate) => candidate.line)
+            ).size,
+            queryOccurrence: new Set(
+              hits
+                .slice(0, selectedIndex)
+                .filter((candidate) => candidate.relPath === hit.relPath)
+                .map((candidate) => candidate.line)
+            ).size
           };
           void selectNote(hit.relPath);
         }
@@ -1436,6 +1487,13 @@ export const AppRuntime = () => {
       void selectNote(row.relPath);
     };
     treeCloseRequest = () => treeView.close();
+    treeCollapseAllRequest = () => treeView.collapseAll();
+    treeExpandAllRequest = () => treeView.expandAll();
+    closeTreeAfterNoteCreation = () => {
+      setTreeSearchQuery('');
+      popContext('tree-search');
+      popContext('tree');
+    };
     openTemplateManagerContext = () =>
       pushContext('templates', keymaps.templates ?? TEMPLATES_KEYMAP);
     treeDrop = (source, index) => {
@@ -1772,12 +1830,15 @@ export const AppRuntime = () => {
         <TreeOverlay
           visible={treeOverlayVisible()}
           rows={visibleTreeRows()}
+          noteCount={notes().length}
           selectedIndex={selectedTreeIndex()}
           searchQuery={treeSearchQuery()}
           searchActive={activeContext() === 'tree-search'}
           onRowClick={(index) => treeAcceptRow(index)}
           marks={treeMarks()}
           onCloseRequest={() => treeCloseRequest()}
+          onCollapseAll={() => treeCollapseAllRequest()}
+          onExpandAll={() => treeExpandAllRequest()}
           onContextMenuVisibilityChange={setTreeContextMenuOpen}
           registerContextMenuDismiss={(dismiss) => {
             dismissTreeContextMenu = dismiss;

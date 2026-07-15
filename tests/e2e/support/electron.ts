@@ -14,7 +14,10 @@ export const launchApp = async (
   extraArgs: readonly string[] = []
 ): Promise<ElectronApplication> => {
   if (activeApplication) throw new Error('An Electron test application is already running');
-  activeApplication = await electron.launch({ args: [process.cwd(), ...extraArgs], env });
+  activeApplication = await electron.launch({
+    args: [process.cwd(), ...extraArgs],
+    env: { ...env, FOLEA_DISABLE_HARDWARE_ACCELERATION: '1' }
+  });
   return activeApplication;
 };
 

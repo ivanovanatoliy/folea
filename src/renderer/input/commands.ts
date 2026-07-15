@@ -18,6 +18,8 @@ export interface TreeView {
   moveUp(): void;
   collapse(): void;
   expand(): void;
+  collapseAll(): void;
+  expandAll(): void;
   close(): void;
   openSearch(): void;
   closeSearch(): void;

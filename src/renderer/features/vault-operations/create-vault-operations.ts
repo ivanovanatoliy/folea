@@ -38,6 +38,7 @@ interface VaultOperationsOptions {
   readonly openTemplateManager: () => void;
   readonly reportError: (error: unknown) => void;
   readonly reportWarnings: (warnings: readonly string[]) => void;
+  readonly onNoteCreated?: (relPath: string) => void;
 }
 
 export interface VaultOperations {
@@ -105,6 +106,7 @@ export const createVaultOperations = (options: VaultOperationsOptions): VaultOpe
       options.setLastCreationTemplate(state.lastCreationTemplate);
       await options.refreshVault(state);
       await options.selectNote(relPath);
+      options.onNoteCreated?.(relPath);
     } catch (error) {
       options.reportError(error);
     }
