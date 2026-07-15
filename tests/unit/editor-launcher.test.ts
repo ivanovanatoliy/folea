@@ -1,6 +1,20 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { spawn } from 'node:child_process';
 
-import { buildEditorArgs, EditorLauncher, nvimSockPath } from '../../src/main/editor-launcher';
+import {
+  buildEditorArgs,
+  EditorLauncher,
+  nvimSockPath,
+  parseEditorCommand
+} from '../../src/main/editor-launcher';
+
+vi.mock('node:child_process', async (importOriginal) => {
+  const original = await importOriginal<typeof import('node:child_process')>();
+  return {
+    ...original,
+    spawn: vi.fn(() => ({ on: vi.fn(), unref: vi.fn() }))
+  };
+});
 
 const SOCK = '/tmp/folea-nvim-test.sock';
 
@@ -72,6 +86,20 @@ describe('buildEditorArgs', () => {
     ]);
   });
 
+  it('preserves quoted arguments without passing them to a shell', () => {
+    expect(
+      buildEditorArgs('/vault/path with spaces/note.typ', SOCK, 'editor --label "My Notes" %FILE%')
+    ).toEqual(['editor', '--label', 'My Notes', '/vault/path with spaces/note.typ']);
+  });
+
+  it.each([';', '$()', '&', '|', '`touch owned`', '%COMSPEC%', '^&'])(
+    'keeps shell metacharacters in the file path as one argv value: %s',
+    (metacharacter) => {
+      const path = `/vault/note ${metacharacter}.typ`;
+      expect(buildEditorArgs(path, SOCK, 'editor %FILE%')).toEqual(['editor', path]);
+    }
+  );
+
   it('FOLEA_EDITOR_CMD overrides configured editor.command', () => {
     process.env.FOLEA_EDITOR_CMD = 'kitty -e nvim %FILE%';
     expect(buildEditorArgs('/vault/note.typ', SOCK, 'alacritty -e nvim %FILE%')).toEqual([
@@ -91,6 +119,22 @@ describe('buildEditorArgs', () => {
   });
 });
 
+describe('parseEditorCommand', () => {
+  it('supports quoted and escaped argv', () => {
+    expect(parseEditorCommand(`editor 'single value' "double value" escaped\\ value`)).toEqual([
+      'editor',
+      'single value',
+      'double value',
+      'escaped value'
+    ]);
+  });
+
+  it('rejects empty and unterminated commands', () => {
+    expect(() => parseEditorCommand('   ')).toThrow('must include an executable');
+    expect(() => parseEditorCommand(`editor 'unfinished`)).toThrow('unterminated quote');
+  });
+});
+
 describe('EditorLauncher.open path validation', () => {
   it('rejects path traversal', () => {
     const launcher = new EditorLauncher();
@@ -101,6 +145,17 @@ describe('EditorLauncher.open path validation', () => {
     const launcher = new EditorLauncher();
     expect(() => launcher.open('/tmp', 'note.typ')).not.toThrow();
     launcher.dispose();
+  });
+
+  it('launches with shell disabled and preserves a metacharacter path as one argument', () => {
+    const launcher = new EditorLauncher();
+    launcher.open('/tmp', 'note;touch owned.typ', 'editor %FILE%');
+
+    expect(vi.mocked(spawn)).toHaveBeenLastCalledWith(
+      'editor',
+      ['/tmp/note;touch owned.typ'],
+      expect.objectContaining({ shell: false })
+    );
   });
 });
 

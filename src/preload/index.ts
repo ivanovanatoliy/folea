@@ -7,11 +7,10 @@ import {
 } from '../shared/ipc/app';
 import {
   APP_STATE_LOAD_CHANNEL,
-  APP_STATE_UPDATE_CHANNEL,
+  APP_STATE_REMOVE_RECENT_CHANNEL,
   parseAppStateFileV1,
-  parseAppStatePatch,
-  type AppStateFileV1,
-  type AppStatePatch
+  parseRemoveRecentVaultRequest,
+  type AppStateFileV1
 } from '../shared/ipc/app-state';
 import { EDITOR_OPEN_CHANNEL, validateEditorOpenRelPath } from '../shared/ipc/editor';
 import {
@@ -141,9 +140,9 @@ const bridge: FoleaBridge = Object.freeze({
       const response = await ipcRenderer.invoke(APP_STATE_LOAD_CHANNEL);
       return parseAppStateFileV1(response);
     },
-    update: async (patch: AppStatePatch): Promise<AppStateFileV1> => {
-      const validated = parseAppStatePatch(patch);
-      const response = await ipcRenderer.invoke(APP_STATE_UPDATE_CHANNEL, validated);
+    removeRecentVault: async (rootPath: string): Promise<AppStateFileV1> => {
+      const validated = parseRemoveRecentVaultRequest({ type: 'removeRecentVault', rootPath });
+      const response = await ipcRenderer.invoke(APP_STATE_REMOVE_RECENT_CHANNEL, validated);
       return parseAppStateFileV1(response);
     }
   }),

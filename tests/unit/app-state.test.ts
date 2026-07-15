@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   parseAppStateFileV1,
   parseAppStatePatch,
+  parseRemoveRecentVaultRequest,
   defaultAppState
 } from '../../src/shared/ipc/app-state';
 
@@ -119,5 +120,22 @@ describe('defaultAppState', () => {
     expect(state.schemaVersion).toBe(1);
     expect(state.lastOpenedVaultPath).toBeNull();
     expect(state.recentVaults).toEqual([]);
+  });
+});
+
+describe('renderer app state boundary', () => {
+  it('allows removing a recent vault', () => {
+    expect(
+      parseRemoveRecentVaultRequest({ type: 'removeRecentVault', rootPath: '/vault' })
+    ).toEqual({ type: 'removeRecentVault', rootPath: '/vault' });
+  });
+
+  it('rejects trusted main-process state mutations', () => {
+    expect(() =>
+      parseRemoveRecentVaultRequest({ type: 'setLastOpenedVault', rootPath: '/untrusted' })
+    ).toThrow('Only recent vault removal');
+    expect(() => parseRemoveRecentVaultRequest({ type: 'clearInvalidLastOpenedVault' })).toThrow(
+      'Only recent vault removal'
+    );
   });
 });

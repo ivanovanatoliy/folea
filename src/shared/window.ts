@@ -1,5 +1,5 @@
 import type { FoleaAppBridge } from './ipc/app';
-import type { AppStateFileV1, AppStatePatch } from './ipc/app-state';
+import type { AppStateFileV1 } from './ipc/app-state';
 import type { FoleaEditorBridge } from './ipc/editor';
 import type { KeysConfigLoadResponse } from './ipc/keys-config';
 import type { FoleaSearchBridge } from './ipc/search';
@@ -17,7 +17,7 @@ import type {
 
 export interface FoleaAppStateBridge {
   load(): Promise<AppStateFileV1>;
-  update(patch: AppStatePatch): Promise<AppStateFileV1>;
+  removeRecentVault(rootPath: string): Promise<AppStateFileV1>;
 }
 
 export interface FoleaVaultStateBridge {

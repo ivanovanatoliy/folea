@@ -62,12 +62,12 @@ export class EditorLauncher {
 
   private launchEditor(absPath: string, sockPath: string, configuredCommand: string): void {
     const args = buildEditorArgs(absPath, sockPath, configuredCommand);
-    // shell: true so the command is resolved against the user's full PATH,
-    // which Electron does not inherit when launched from a desktop environment.
     const child = spawn(args[0] as string, args.slice(1), {
       detached: true,
       stdio: 'ignore',
-      shell: true
+      // Never pass note paths through a shell. They are user-controlled filenames
+      // and may contain shell metacharacters.
+      shell: false
     });
     child.on('error', (err) => console.error('[folea] editor launch failed:', err.message));
     child.unref();
@@ -81,15 +81,85 @@ export function buildEditorArgs(
 ): string[] {
   const custom = process.env.FOLEA_EDITOR_CMD || configuredCommand;
   if (custom) {
-    return custom
-      .trim()
-      .split(/\s+/)
-      .map((token) => {
-        if (token === '%FILE%') return absPath;
-        if (token === '%SOCK%') return sockPath;
-        return token;
-      });
+    return parseEditorCommand(custom).map((token) => {
+      if (token === '%FILE%') return absPath;
+      if (token === '%SOCK%') return sockPath;
+      return token;
+    });
   }
 
   return ['code', '--reuse-window', absPath];
+}
+
+/**
+ * Parse an executable and argv without invoking a shell. Quotes group arguments;
+ * shell substitutions and metacharacters remain ordinary argument text.
+ */
+export function parseEditorCommand(command: string): string[] {
+  const args: string[] = [];
+  let current = '';
+  let quote: "'" | '"' | undefined;
+  let tokenStarted = false;
+
+  const finishToken = (): void => {
+    if (!tokenStarted) return;
+    args.push(current);
+    current = '';
+    tokenStarted = false;
+  };
+
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index]!;
+
+    if (quote) {
+      if (character === quote) {
+        quote = undefined;
+        tokenStarted = true;
+      } else if (character === '\\' && quote === '"') {
+        const next = command[index + 1];
+        if (next === '"' || next === '\\') {
+          current += next;
+          index += 1;
+        } else {
+          current += character;
+        }
+      } else {
+        current += character;
+      }
+      continue;
+    }
+
+    if (character === "'" || character === '"') {
+      quote = character;
+      tokenStarted = true;
+    } else if (/\s/.test(character)) {
+      finishToken();
+    } else if (character === '\\') {
+      const next = command[index + 1];
+      if (
+        next !== undefined &&
+        (/\s/.test(next) || next === "'" || next === '"' || next === '\\')
+      ) {
+        current += next;
+        tokenStarted = true;
+        index += 1;
+      } else {
+        current += character;
+        tokenStarted = true;
+      }
+    } else {
+      current += character;
+      tokenStarted = true;
+    }
+  }
+
+  if (quote) {
+    throw new Error('editor.command contains an unterminated quote');
+  }
+
+  finishToken();
+  if (args.length === 0 || args[0] === '') {
+    throw new Error('editor.command must include an executable');
+  }
+  return args;
 }

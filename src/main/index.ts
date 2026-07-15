@@ -1,10 +1,27 @@
-import { app, BrowserWindow, session } from 'electron';
+import { app, BrowserWindow, protocol, session } from 'electron';
 
 import { openConfiguredVaultFromEnvironment, registerIpcHandlers } from './ipc';
-import { createMainWindow, installContentSecurityPolicy } from './window';
+import {
+  createMainWindow,
+  installContentSecurityPolicy,
+  installTypstWorkerProtocol
+} from './window';
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'folea-worker',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true
+    }
+  }
+]);
 
 void app.whenReady().then(() => {
   installContentSecurityPolicy(session.defaultSession);
+  installTypstWorkerProtocol();
   registerIpcHandlers();
   void openConfiguredVaultFromEnvironment().then(() => {
     createMainWindow();

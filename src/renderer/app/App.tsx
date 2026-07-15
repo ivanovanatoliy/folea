@@ -243,6 +243,7 @@ export const App = () => {
   let pendingSearchTarget: (SurfaceSearchTarget & { readonly relPath: string }) | undefined;
   let pendingPositionRestore: NotePositionState | undefined;
   let pendingZoomRestore: { readonly relPath: string; readonly state: ZoomState } | undefined;
+  let navigationGeneration = 0;
 
   // Action refs — set inside onMount, consumed by JSX click handlers
   let paletteAcceptRow: (index: number) => void = () => {};
@@ -511,12 +512,15 @@ export const App = () => {
     }
   };
 
-  const tryPersistentCacheRender = async (relPath: string): Promise<boolean> => {
+  const tryPersistentCacheRender = async (
+    relPath: string,
+    generation: number
+  ): Promise<boolean> => {
     if (!surface) return false;
 
     try {
       const response = await window.folea.vaultState.readRenderCache({ relPath });
-      if (!response.hit) return false;
+      if (generation !== navigationGeneration || !response.hit) return false;
       return surface.renderFromCache(relPath, response.cacheKey, response.entry);
     } catch {
       return false;
@@ -525,11 +529,14 @@ export const App = () => {
 
   const openNoteWithState = async (
     relPath: string,
+    generation: number,
     vaultState?: VaultStateFileV1
   ): Promise<void> => {
     await flushPosition();
+    if (generation !== navigationGeneration) return;
     positionDebounce.dispose();
     const stateForRestore = vaultState ?? (await loadVaultStateOrDefault());
+    if (generation !== navigationGeneration) return;
     const positionForRestore = stateForRestore.notePositions[relPath];
     pendingZoomRestore = {
       relPath,
@@ -553,12 +560,16 @@ export const App = () => {
         openedAt: new Date().toISOString()
       });
       const updatedState = await window.folea.vaultState.load();
-      setRecentNotes(updatedState.recentNotes);
+      if (generation === navigationGeneration) {
+        setRecentNotes(updatedState.recentNotes);
+      }
     } catch {
       // vault may not be ready yet
     }
 
-    const cacheHit = await tryPersistentCacheRender(relPath);
+    if (generation !== navigationGeneration) return;
+    const cacheHit = await tryPersistentCacheRender(relPath, generation);
+    if (generation !== navigationGeneration) return;
 
     try {
       const [source, sourceFiles] = await Promise.all([
@@ -566,20 +577,20 @@ export const App = () => {
         cacheHit ? Promise.resolve(undefined) : readTypstSourceFiles()
       ]);
 
-      if (selectedRelPath() !== relPath) return;
+      if (generation !== navigationGeneration || selectedRelPath() !== relPath) return;
 
       setCurrentSource(source);
       if (!cacheHit) {
         surface?.render(relPath, source, sourceFiles!);
       }
     } catch {
-      if (!cacheHit) {
+      if (generation === navigationGeneration && !cacheHit) {
         surface?.showError([{ severity: 'error', message: 'Unable to read note' }]);
       }
     }
   };
 
-  const renderSelectedNote = async (nextNotes = notes()): Promise<void> => {
+  const renderSelectedNote = async (generation: number, nextNotes = notes()): Promise<void> => {
     const currentRelPath = selectedRelPath();
     const nextRelPath =
       nextNotes.find((note) => note.relPath === currentRelPath)?.relPath ??
@@ -601,7 +612,7 @@ export const App = () => {
       readTypstSourceFiles()
     ]);
 
-    if (selectedRelPath() !== nextRelPath) {
+    if (generation !== navigationGeneration || selectedRelPath() !== nextRelPath) {
       return;
     }
 
@@ -610,12 +621,13 @@ export const App = () => {
   };
 
   const selectNote = async (relPath: string): Promise<void> => {
+    const generation = ++navigationGeneration;
     if (relPath === selectedRelPath()) {
-      await renderSelectedNote();
+      await renderSelectedNote(generation);
       return;
     }
 
-    await openNoteWithState(relPath);
+    await openNoteWithState(relPath, generation);
   };
 
   const openNote = (relPath: string, _currentNoteRelPath: string | undefined): void => {
@@ -726,6 +738,7 @@ export const App = () => {
   };
 
   const refreshVault = async (vsParam?: VaultStateFileV1): Promise<void> => {
+    const generation = ++navigationGeneration;
     try {
       renderSourceFiles = undefined;
       const snapshot = await window.folea.vault.snapshot();
@@ -774,9 +787,9 @@ export const App = () => {
         targetRelPath = listedNotes[0]?.relPath;
       }
 
-      if (targetRelPath) {
-        await openNoteWithState(targetRelPath, vs);
-      } else {
+      if (targetRelPath && generation === navigationGeneration) {
+        await openNoteWithState(targetRelPath, generation, vs);
+      } else if (!targetRelPath && generation === navigationGeneration) {
         surface?.clear();
       }
 
@@ -788,6 +801,7 @@ export const App = () => {
         });
       }, 500);
     } catch {
+      if (generation !== navigationGeneration) return;
       vaultIndex.rebuild([]);
       setNotes([]);
       setDirectories([]);
@@ -1189,10 +1203,7 @@ export const App = () => {
 
   const removeRecentVault = async (rootPath: string): Promise<void> => {
     try {
-      const next = await window.folea.appState.update({
-        type: 'removeRecentVault',
-        rootPath
-      });
+      const next = await window.folea.appState.removeRecentVault(rootPath);
       setRecentVaults(next.recentVaults);
     } catch {
       setRecentVaults((vaults) => vaults.filter((vault) => vault !== rootPath));
@@ -1967,7 +1978,8 @@ export const App = () => {
           }
         })();
       } else if (isCurrentDeleted) {
-        void renderSelectedNote(nextNotes).catch(() =>
+        const generation = ++navigationGeneration;
+        void renderSelectedNote(generation, nextNotes).catch(() =>
           surface?.showError([{ severity: 'error', message: 'Unable to read selected note' }])
         );
       }

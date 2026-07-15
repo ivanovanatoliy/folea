@@ -5,7 +5,7 @@ export const rendererContentSecurityPolicy = [
   "img-src 'self' data:",
   "font-src 'self'",
   "connect-src 'self'",
-  "worker-src 'self' blob:",
+  "worker-src 'self' blob: folea-worker:",
   "object-src 'none'",
   "base-uri 'none'",
   "frame-ancestors 'none'"
@@ -25,3 +25,5 @@ export const typstWorkerContentSecurityPolicy = [
   "base-uri 'none'",
   "frame-ancestors 'none'"
 ].join('; ');
+
+export const TYPST_WORKER_CSP_MARKER = 'folea-typst-worker';

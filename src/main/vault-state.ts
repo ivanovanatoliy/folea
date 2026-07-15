@@ -463,32 +463,71 @@ export const invalidateRenderCache = async (
 
 // ── Vault state manager (per open vault) ──────────────────────────────────────
 
+class SerialTaskQueue {
+  private tail: Promise<void> = Promise.resolve();
+
+  run<T>(task: () => Promise<T>): Promise<T> {
+    const result = this.tail.then(task, task);
+    this.tail = result.then(
+      () => undefined,
+      () => undefined
+    );
+    return result;
+  }
+}
+
+export interface VaultStatePersistence {
+  loadState(vaultRoot: string): Promise<VaultStateFileV1>;
+  saveState(vaultRoot: string, state: VaultStateFileV1): Promise<void>;
+  readCache(vaultRoot: string, request: ReadRenderCacheRequest): Promise<ReadRenderCacheResponse>;
+  writeCache(vaultRoot: string, request: WriteRenderCacheRequest): Promise<void>;
+  invalidateCache(vaultRoot: string, relPaths: readonly string[]): Promise<void>;
+}
+
+const defaultPersistence: VaultStatePersistence = {
+  loadState: loadVaultState,
+  saveState: saveVaultState,
+  readCache: readRenderCache,
+  writeCache: writeRenderCache,
+  invalidateCache: invalidateRenderCache
+};
+
 export class VaultStateManager {
   private state: VaultStateFileV1 = defaultVaultState();
+  private readonly stateQueue = new SerialTaskQueue();
+  private readonly cacheQueue = new SerialTaskQueue();
 
-  constructor(private readonly vaultRoot: string) {}
+  constructor(
+    private readonly vaultRoot: string,
+    private readonly persistence: VaultStatePersistence = defaultPersistence
+  ) {}
 
   async load(): Promise<VaultStateFileV1> {
-    this.state = await loadVaultState(this.vaultRoot);
-    return this.state;
+    return this.stateQueue.run(async () => {
+      this.state = await this.persistence.loadState(this.vaultRoot);
+      return this.state;
+    });
   }
 
   async update(patch: VaultStatePatch): Promise<VaultStateFileV1> {
-    this.state = applyVaultStatePatch(this.state, patch);
-    await saveVaultState(this.vaultRoot, this.state);
-    return this.state;
+    return this.stateQueue.run(async () => {
+      const next = applyVaultStatePatch(this.state, patch);
+      await this.persistence.saveState(this.vaultRoot, next);
+      this.state = next;
+      return this.state;
+    });
   }
 
   async readRenderCache(request: ReadRenderCacheRequest): Promise<ReadRenderCacheResponse> {
-    return readRenderCache(this.vaultRoot, request);
+    return this.cacheQueue.run(() => this.persistence.readCache(this.vaultRoot, request));
   }
 
   async writeRenderCache(request: WriteRenderCacheRequest): Promise<void> {
-    return writeRenderCache(this.vaultRoot, request);
+    return this.cacheQueue.run(() => this.persistence.writeCache(this.vaultRoot, request));
   }
 
   async invalidateRenderCache(relPaths: readonly string[]): Promise<void> {
-    await invalidateRenderCache(this.vaultRoot, relPaths);
+    await this.cacheQueue.run(() => this.persistence.invalidateCache(this.vaultRoot, relPaths));
   }
 
   getState(): VaultStateFileV1 {

@@ -1,6 +1,7 @@
 import type { NotePositionState, WriteRenderCacheRequest } from '../../shared/ipc/vault-state';
 import { parseCompileResult, type CompileResult } from '../../shared/worker/typst';
 import { TYPST_COMPILER_VERSION_TAG } from '../../workers/typst-compile/cache';
+import { createTypstWorker } from '../shared/create-typst-worker';
 
 export const POSITION_DEBOUNCE_MS = 500;
 export const WARMUP_STATUS_THROTTLE_MS = 250;
@@ -143,9 +144,7 @@ export const createWarmupQueue = (
 
   const ensureWorker = (): Worker => {
     if (!worker) {
-      worker = new Worker(new URL('../../workers/typst-compile/index.ts', import.meta.url), {
-        type: 'module'
-      });
+      worker = createTypstWorker();
       worker.addEventListener('message', (event: MessageEvent<unknown>) => {
         try {
           const result = parseCompileResult(event.data);

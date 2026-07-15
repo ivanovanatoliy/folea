@@ -19,6 +19,13 @@ import {
 const DELETE_COALESCE_MS = 150;
 const STRUCTURAL_DEBOUNCE_MS = 80;
 
+export const observeWatcherTask = (
+  task: Promise<void>,
+  onError: (error: unknown) => void
+): void => {
+  void task.catch(onError);
+};
+
 export class VaultWatcher {
   private watcher: FSWatcher | undefined;
   private readonly pendingDeletes = new Map<VaultPath, ReturnType<typeof setTimeout>>();
@@ -43,8 +50,12 @@ export class VaultWatcher {
 
       this.watcher.once('ready', resolve);
       this.watcher.once('error', reject);
-      this.watcher.on('add', (absolutePath) => void this.handleAdd(absolutePath));
-      this.watcher.on('change', (absolutePath) => void this.handleChange(absolutePath));
+      this.watcher.on('add', (absolutePath) =>
+        observeWatcherTask(this.handleAdd(absolutePath), this.reportError)
+      );
+      this.watcher.on('change', (absolutePath) =>
+        observeWatcherTask(this.handleChange(absolutePath), this.reportError)
+      );
       this.watcher.on('unlink', (absolutePath) => this.handleUnlink(absolutePath));
       this.watcher.on('addDir', (absolutePath) =>
         this.handleDirectory(absolutePath, 'directory-created')
@@ -56,6 +67,10 @@ export class VaultWatcher {
 
     await ready;
   }
+
+  private readonly reportError = (error: unknown): void => {
+    console.error('[vault-watcher] Failed to process filesystem event:', error);
+  };
 
   async close(): Promise<void> {
     for (const timer of this.pendingDeletes.values()) {

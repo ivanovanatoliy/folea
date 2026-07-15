@@ -247,6 +247,39 @@ test('keeps the renderer security invariants enabled', async () => {
   expect(csp).toContain("object-src 'none'");
 });
 
+test('serves the production Typst worker with its restricted worker CSP', async () => {
+  const vaultRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'folea-e2e-worker-csp-'));
+  await fs.writeFile(path.join(vaultRoot, 'index.typ'), '= Production worker CSP\n', 'utf8');
+
+  try {
+    const app = await launchApp({
+      ...currentEnv(),
+      FOLEA_ALLOW_TEST_VAULT_OPEN: '1',
+      FOLEA_TEST_VAULT_PATH: vaultRoot
+    });
+    const page = await app.firstWindow();
+    const workerResponsePromise = page.waitForResponse(
+      (response) => new URL(response.url()).searchParams.get('folea-typst-worker') === '1',
+      { timeout: 10_000 }
+    );
+
+    await expectSurfaceRendered(page);
+    await expect(page.getByTestId('typst-rendered-document')).toContainText(
+      'Production worker CSP'
+    );
+
+    const workerResponse = await workerResponsePromise;
+    const workerCsp = (await workerResponse.allHeaders())['content-security-policy'];
+    expect(workerResponse.url()).toMatch(
+      /^folea-worker:\/\/assets\/index-[A-Za-z0-9_-]+\.js\?folea-typst-worker=1$/
+    );
+    expect(workerCsp).toContain("script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'");
+    expect(workerCsp).toContain("worker-src 'none'");
+  } finally {
+    await fs.rm(vaultRoot, { recursive: true, force: true });
+  }
+});
+
 test('opens a configured vault, lists notes, and renders the selected note', async () => {
   const vaultRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'folea-e2e-vault-'));
   const detailBody = Array.from({ length: 48 }, (_, i) => `Detail line ${i + 1}.`).join('\n\n');
@@ -755,6 +788,84 @@ test('editor.open rejects invalid relPath in the preload', async () => {
 
   expect(error).toBeTruthy();
   expect(typeof error).toBe('string');
+});
+
+test('opens a shell-metacharacter note path as one editor argument', async () => {
+  const vaultRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'folea-e2e-editor-vault-'));
+  const helperRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'folea-e2e-editor-helper-'));
+  const helperPath = path.join(helperRoot, 'capture-argv.cjs');
+  const resultPath = path.join(helperRoot, 'result.txt');
+  const injectionMarker = path.join(process.cwd(), 'folea-editor-injection-marker.typ');
+  const noteName = 'note&touch folea-editor-injection-marker.typ';
+  await fs.writeFile(path.join(vaultRoot, noteName), '= Safe editor launch\n', 'utf8');
+  await fs.writeFile(
+    helperPath,
+    `require('node:fs').writeFileSync(process.argv[2], process.argv[3], 'utf8');\n`,
+    'utf8'
+  );
+
+  try {
+    const editorCommand = [process.execPath, helperPath, resultPath, '%FILE%']
+      .map((argument) => JSON.stringify(argument))
+      .join(' ');
+    const app = await launchApp({
+      ...currentEnv(),
+      FOLEA_ALLOW_TEST_VAULT_OPEN: '1',
+      FOLEA_TEST_VAULT_PATH: vaultRoot,
+      FOLEA_EDITOR_CMD: editorCommand
+    });
+    const page = await app.firstWindow();
+    await expectSurfaceRendered(page);
+
+    await page.keyboard.press(':');
+    await page.keyboard.type('Open in editor');
+    await expect(page.getByTestId('palette-row').first()).toContainText('Open in editor');
+    await page.keyboard.press('Enter');
+
+    await expect
+      .poll(() => fs.readFile(resultPath, 'utf8').catch(() => null))
+      .toBe(path.join(vaultRoot, noteName));
+    await expect
+      .poll(() =>
+        fs
+          .stat(injectionMarker)
+          .then(() => true)
+          .catch(() => false)
+      )
+      .toBe(false);
+  } finally {
+    await fs.rm(vaultRoot, { recursive: true, force: true });
+    await fs.rm(helperRoot, { recursive: true, force: true });
+    await fs.rm(injectionMarker, { force: true });
+  }
+});
+
+test('keeps the latest note selected during rapid tree navigation', async () => {
+  const vaultRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'folea-e2e-navigation-vault-'));
+  await fs.writeFile(path.join(vaultRoot, 'base.typ'), '= Base\n', 'utf8');
+  await fs.writeFile(path.join(vaultRoot, 'first.typ'), '= First choice\n', 'utf8');
+  await fs.writeFile(path.join(vaultRoot, 'second.typ'), '= Latest choice\n', 'utf8');
+
+  try {
+    const app = await launchApp({
+      ...currentEnv(),
+      FOLEA_ALLOW_TEST_VAULT_OPEN: '1',
+      FOLEA_TEST_VAULT_PATH: vaultRoot
+    });
+    const page = await app.firstWindow();
+    await expectSurfaceRendered(page);
+
+    await page.keyboard.press('Control+b');
+    await expect(page.getByTestId('tree-overlay')).toBeVisible();
+    await page.getByTestId('tree-row').filter({ hasText: 'first.typ' }).click();
+    await page.getByTestId('tree-row').filter({ hasText: 'second.typ' }).click();
+
+    await expect(page.getByTestId('statusline-doc')).toHaveText('second.typ');
+    await expect(page.getByTestId('typst-rendered-document')).toContainText('Latest choice');
+    await expect(page.getByTestId('typst-rendered-document')).not.toContainText('First choice');
+  } finally {
+    await fs.rm(vaultRoot, { recursive: true, force: true });
+  }
 });
 
 test('loads theme and key remaps from config files', async () => {

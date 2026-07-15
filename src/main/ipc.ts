@@ -57,8 +57,8 @@ import {
 import { validateShellOpenExternalRequest } from '../shared/ipc/shell';
 import {
   APP_STATE_LOAD_CHANNEL,
-  APP_STATE_UPDATE_CHANNEL,
-  parseAppStatePatch,
+  APP_STATE_REMOVE_RECENT_CHANNEL,
+  parseRemoveRecentVaultRequest,
   parseAppStateFileV1
 } from '../shared/ipc/app-state';
 import {
@@ -186,9 +186,9 @@ export const registerIpcHandlers = (): void => {
     return parseAppStateFileV1(await loadAppState());
   });
 
-  ipcMain.removeHandler(APP_STATE_UPDATE_CHANNEL);
-  ipcMain.handle(APP_STATE_UPDATE_CHANNEL, async (_event, request: unknown) => {
-    const patch = parseAppStatePatch(request);
+  ipcMain.removeHandler(APP_STATE_REMOVE_RECENT_CHANNEL);
+  ipcMain.handle(APP_STATE_REMOVE_RECENT_CHANNEL, async (_event, request: unknown) => {
+    const patch = parseRemoveRecentVaultRequest(request);
     return parseAppStateFileV1(await updateAppState(patch));
   });
 

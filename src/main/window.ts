@@ -1,9 +1,10 @@
-import { app, BrowserWindow, shell, type Session, type WebPreferences } from 'electron';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { app, BrowserWindow, protocol, shell, type Session, type WebPreferences } from 'electron';
+import { existsSync, promises as fs } from 'node:fs';
+import { extname, join, resolve, sep } from 'node:path';
 
 import {
   rendererContentSecurityPolicy,
+  TYPST_WORKER_CSP_MARKER,
   typstWorkerContentSecurityPolicy
 } from '../shared/security';
 
@@ -23,7 +24,8 @@ export const installContentSecurityPolicy = (targetSession: Session): void => {
   }
 
   targetSession.webRequest.onHeadersReceived((details, callback) => {
-    const contentSecurityPolicy = isTypstCompileWorkerUrl(details.url)
+    const isTypstWorker = isTypstCompileWorkerUrl(details.url);
+    const contentSecurityPolicy = isTypstWorker
       ? typstWorkerContentSecurityPolicy
       : rendererContentSecurityPolicy;
 
@@ -38,8 +40,64 @@ export const installContentSecurityPolicy = (targetSession: Session): void => {
   contentSecurityPolicyInstalled = true;
 };
 
-const isTypstCompileWorkerUrl = (url: string): boolean =>
-  url.includes('/src/workers/typst-compile/');
+const WORKER_ASSET_CONTENT_TYPES: Readonly<Record<string, string>> = {
+  '.js': 'text/javascript; charset=utf-8',
+  '.wasm': 'application/wasm',
+  '.otf': 'font/otf',
+  '.ttf': 'font/ttf'
+};
+
+export const parseTypstWorkerAssetName = (requestUrl: string): string => {
+  const url = new URL(requestUrl);
+  if (url.protocol !== 'folea-worker:' || url.hostname !== 'assets') {
+    throw new Error('Invalid Typst worker asset origin');
+  }
+
+  const assetName = decodeURIComponent(url.pathname.slice(1));
+  if (
+    assetName.length === 0 ||
+    assetName.includes('/') ||
+    assetName.includes('\\') ||
+    assetName === '.' ||
+    assetName === '..' ||
+    WORKER_ASSET_CONTENT_TYPES[extname(assetName)] === undefined
+  ) {
+    throw new Error('Invalid Typst worker asset path');
+  }
+  return assetName;
+};
+
+export const installTypstWorkerProtocol = (): void => {
+  protocol.handle('folea-worker', async (request) => {
+    try {
+      const assetName = parseTypstWorkerAssetName(request.url);
+      const assetsRoot = resolve(join(app.getAppPath(), 'out/renderer/assets'));
+      const assetPath = resolve(join(assetsRoot, assetName));
+      if (!assetPath.startsWith(`${assetsRoot}${sep}`)) {
+        return new Response('Not found', { status: 404 });
+      }
+
+      const body = await fs.readFile(assetPath);
+      return new Response(body, {
+        headers: {
+          'Content-Type': WORKER_ASSET_CONTENT_TYPES[extname(assetName)]!,
+          'Content-Security-Policy': typstWorkerContentSecurityPolicy,
+          'Cache-Control': 'no-cache'
+        }
+      });
+    } catch {
+      return new Response('Not found', { status: 404 });
+    }
+  });
+};
+
+export const isTypstCompileWorkerUrl = (url: string): boolean => {
+  try {
+    return new URL(url).searchParams.get(TYPST_WORKER_CSP_MARKER) === '1';
+  } catch {
+    return false;
+  }
+};
 
 export const createMainWindow = (): BrowserWindow => {
   const iconPath = join(app.getAppPath(), 'build/icon.png');

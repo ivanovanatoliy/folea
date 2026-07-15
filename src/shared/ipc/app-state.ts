@@ -1,5 +1,5 @@
 export const APP_STATE_LOAD_CHANNEL = 'folea:appState:load' as const;
-export const APP_STATE_UPDATE_CHANNEL = 'folea:appState:update' as const;
+export const APP_STATE_REMOVE_RECENT_CHANNEL = 'folea:appState:removeRecent' as const;
 
 export const RECENT_VAULTS_MAX = 10;
 
@@ -14,6 +14,8 @@ export type AppStatePatch =
   | { readonly type: 'setLastOpenedVault'; readonly rootPath: string }
   | { readonly type: 'removeRecentVault'; readonly rootPath: string }
   | { readonly type: 'clearInvalidLastOpenedVault' };
+
+export type RemoveRecentVaultRequest = Extract<AppStatePatch, { type: 'removeRecentVault' }>;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -80,6 +82,14 @@ export const parseAppStatePatch = (value: unknown): AppStatePatch => {
     default:
       throw new TypeError('Unknown app state patch type');
   }
+};
+
+export const parseRemoveRecentVaultRequest = (value: unknown): RemoveRecentVaultRequest => {
+  const patch = parseAppStatePatch(value);
+  if (patch.type !== 'removeRecentVault') {
+    throw new TypeError('Only recent vault removal is available to the renderer');
+  }
+  return patch;
 };
 
 export const defaultAppState = (): AppStateFileV1 => ({

@@ -11,6 +11,7 @@ import type { CaretEngine, LinkTarget } from './caret';
 import { createCaretEngine } from './caret';
 import type { ContentBounds, ZoomState } from './zoom';
 import { createZoomController } from './zoom';
+import { createTypstWorker } from '../shared/create-typst-worker';
 
 export interface SurfaceRenderedDetail {
   readonly noteId: string;
@@ -90,8 +91,7 @@ interface SurfaceOptions {
   readonly createWorker?: () => Worker;
 }
 
-const createDefaultWorker = (): Worker =>
-  new Worker(new URL('../../workers/typst-compile/index.ts', import.meta.url), { type: 'module' });
+const createDefaultWorker = createTypstWorker;
 
 export const createSurface = (
   container: HTMLElement,
