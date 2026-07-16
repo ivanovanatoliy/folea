@@ -100,6 +100,14 @@ describe('keys.config parser', () => {
     expect(isValidChord('gg')).toBe(true);
     expect(parseKeysConfig('document.scrollLineDown gg', known).overrides[0]?.chord).toBe('gg');
   });
+
+  it('accepts space chords', () => {
+    expect(isValidChord('Space')).toBe(true);
+    expect(isValidChord('<S-Space>')).toBe(true);
+    expect(parseKeysConfig('document.scrollHalfDown Space', known).overrides[0]?.chord).toBe(
+      'Space'
+    );
+  });
 });
 
 describe('applyKeysConfigOverrides', () => {

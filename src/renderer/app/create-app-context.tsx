@@ -18,6 +18,7 @@ import {
   flattenTree,
   getFolderAncestors,
   getParentFolderPath,
+  isVisibleTreePath,
   pruneTreeMarks,
   toggleTreeMark,
   type TreeRow
@@ -319,7 +320,10 @@ export const AppRuntime = () => {
       (activeContext() === 'vault-dialog' && vaultDialogParentContext() === 'templates')
   );
   const quickOpenVisible = createMemo(() => activeContext() === 'quick-open');
-  const treeRoot = createMemo(() => buildTree(notes(), directories()));
+  const visibleTreeNotes = createMemo(() =>
+    notes().filter((note) => isVisibleTreePath(note.relPath))
+  );
+  const treeRoot = createMemo(() => buildTree(visibleTreeNotes(), directories()));
   const treeRows = createMemo(() => flattenTree(treeRoot(), collapsedFolders()));
   const visibleTreeRows = createMemo(() => {
     const query = treeSearchQuery().trim().toLowerCase();
@@ -327,7 +331,7 @@ export const AppRuntime = () => {
       return treeRows();
     }
 
-    return notes()
+    return visibleTreeNotes()
       .filter((note) => {
         const haystack = `${note.title} ${note.relPath}`.toLowerCase();
         return haystack.includes(query);

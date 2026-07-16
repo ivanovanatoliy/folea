@@ -34,9 +34,15 @@ describe('buildBindingIndex', () => {
   });
 
   it('formats special keys with labels', () => {
-    const keymap: Keymap = new Map([['Escape', 'palette.close']]);
+    const keymap: Keymap = new Map([
+      ['Escape', 'palette.close'],
+      ['Space', 'document.scrollHalfDown'],
+      ['<S-Space>', 'document.scrollHalfUp']
+    ]);
     const index = buildBindingIndex([keymap]);
     expect(index.get('palette.close')).toBe('Esc');
+    expect(index.get('document.scrollHalfDown')).toBe('Space');
+    expect(index.get('document.scrollHalfUp')).toBe('Shift+Space');
   });
 
   it('returns empty map for no keymaps', () => {

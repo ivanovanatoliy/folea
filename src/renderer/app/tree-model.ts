@@ -44,6 +44,9 @@ interface MutableFolder {
 export const TREE_ROW_HEIGHT = 28;
 export const TREE_OVERSCAN_ROWS = 6;
 
+export const isVisibleTreePath = (relPath: string): boolean =>
+  relPath.split('/').every((part) => !part.startsWith('.'));
+
 export const buildTree = (
   notes: readonly NoteMeta[],
   directories: readonly VaultDirectory[] = []
@@ -51,6 +54,8 @@ export const buildTree = (
   const root: MutableFolder = { children: new Map<string, MutableFolder | NoteMeta>() };
 
   for (const directory of directories) {
+    if (!isVisibleTreePath(directory.relPath)) continue;
+
     let folder = root;
     for (const part of directory.relPath.split('/')) {
       const existing = folder.children.get(part);
@@ -65,6 +70,8 @@ export const buildTree = (
   }
 
   for (const note of notes) {
+    if (!isVisibleTreePath(note.relPath)) continue;
+
     const parts = note.relPath.split('/').filter((part) => part.length > 0);
     let folder = root;
 

@@ -394,6 +394,46 @@ test('modal input: status line shows active context and scroll keys move the sur
   }
 });
 
+test('scrolls the document with Space and Shift+Space', async () => {
+  const vaultRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'folea-e2e-space-scroll-'));
+  const longContent = Array.from({ length: 80 }, (_, i) => `Space line ${i + 1}.`).join('\n\n');
+  await fs.writeFile(
+    path.join(vaultRoot, 'long.typ'),
+    `= Space Scroll\n\n${longContent}\n`,
+    'utf8'
+  );
+
+  try {
+    const app = await launchApp({
+      ...currentEnv(),
+      FOLEA_ALLOW_TEST_VAULT_OPEN: '1',
+      FOLEA_TEST_VAULT_PATH: vaultRoot
+    });
+    const page = await app.firstWindow();
+    const surface = page.getByTestId('typst-surface');
+    await expectSurfaceRendered(page);
+    await expect.poll(() => surface.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+
+    await page.keyboard.press('Space');
+    await expect.poll(() => surface.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+    const scrollTopAfterSpace = await surface.evaluate((el) => el.scrollTop);
+
+    await page.keyboard.press('Shift+Space');
+    await expect
+      .poll(() => surface.evaluate((el) => el.scrollTop))
+      .toBeLessThan(scrollTopAfterSpace);
+    await expect.poll(() => surface.evaluate((el) => el.scrollTop)).toBe(0);
+
+    await page.keyboard.press('Control+b');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[tree]');
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(50);
+    expect(await surface.evaluate((el) => el.scrollTop)).toBe(0);
+  } finally {
+    await fs.rm(vaultRoot, { recursive: true, force: true });
+  }
+});
+
 test('renders a dev-served note without CSP violations', async () => {
   const vaultRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'folea-e2e-dev-vault-'));
   await fs.writeFile(path.join(vaultRoot, 'alpha.typ'), '= Alpha\n\nDev render path.\n', 'utf8');

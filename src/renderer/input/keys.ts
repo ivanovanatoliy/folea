@@ -46,6 +46,10 @@ const PHYSICAL_PUNCTUATION = new Map<string, readonly [string, string]>([
 const physicalKey = (event: KeyEvent): string => {
   const code = event.code ?? '';
 
+  if (code === 'Space' || event.key === ' ') {
+    return 'Space';
+  }
+
   if (/^Key[A-Z]$/.test(code)) {
     const letter = code.slice('Key'.length).toLowerCase();
     if (/^[A-Z]$/.test(event.key)) return letter.toUpperCase();
@@ -75,6 +79,7 @@ const physicalKey = (event: KeyEvent): string => {
  * Convention (fixed in ADR-0012):
  *   physical letter       → 'j', 'k', 'G'  (derived from event.code on any layout)
  *   named non-printing key → 'Enter'
+ *   space                  → 'Space', '<S-Space>'
  *   control chord         → '<C-d>', '<C-u>'
  *   multi-key             → concatenated by the sequence buffer ('gg')
  *
@@ -94,6 +99,10 @@ export const normalizeChord = (event: KeyEvent): string | null => {
 
   if (event.altKey || event.metaKey) {
     return null;
+  }
+
+  if (key === 'Space' && event.shiftKey === true) {
+    return '<S-Space>';
   }
 
   return key;
