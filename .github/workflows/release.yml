@@ -94,15 +94,22 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
+            arch: x64
             artifact-name: folea-linux-x64
             artifact-path: |
               dist/*.AppImage
               dist/*.deb
           - os: windows-latest
+            arch: x64
             artifact-name: folea-windows-x64
             artifact-path: dist/*.exe
           - os: macos-15-intel
+            arch: x64
             artifact-name: folea-macos-x64
+            artifact-path: dist/*.dmg
+          - os: macos-latest
+            arch: arm64
+            artifact-name: folea-macos-arm64
             artifact-path: dist/*.dmg
     runs-on: ${{ matrix.os }}
     steps:
@@ -118,7 +125,7 @@ jobs:
           RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         run: npm version "$RELEASE_VERSION" --no-git-tag-version --allow-same-version
       - name: Build packages
-        run: npm run package -- --x64
+        run: npm run package -- --${{ matrix.arch }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - if: runner.os == 'Windows'
