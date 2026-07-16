@@ -28,6 +28,21 @@ jobs:
       version: ${{ steps.release.outputs.version }}
       tag: ${{ steps.release.outputs.tag }}
     steps:
+      - name: Authorize release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ACTOR: ${{ github.triggering_actor }}
+        run: |
+          if ! permission="$(gh api "repos/${GITHUB_REPOSITORY}/collaborators/${RELEASE_ACTOR}/permission" --jq '.permission' 2>/dev/null)"; then
+            echo "::error::Unable to verify release permission for ${RELEASE_ACTOR}."
+            exit 1
+          fi
+
+          if [[ "$permission" != "admin" && "$permission" != "maintain" ]]; then
+            echo "::error::Releases require admin or maintain permission. ${RELEASE_ACTOR} has ${permission} permission."
+            exit 1
+          fi
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
