@@ -415,6 +415,10 @@ export const invalidateRenderCache = async (
   await saveManifest(vaultRoot, { ...manifest, updatedAt: new Date().toISOString(), entries });
 };
 
+export const clearRenderCache = async (vaultRoot: string): Promise<void> => {
+  await fs.rm(getRenderCacheDir(vaultRoot), { recursive: true, force: true });
+};
+
 // ── Vault state manager (per open vault) ──────────────────────────────────────
 
 class SerialTaskQueue {
@@ -436,6 +440,7 @@ export interface VaultStatePersistence {
   readCache(vaultRoot: string, request: ReadRenderCacheRequest): Promise<ReadRenderCacheResponse>;
   writeCache(vaultRoot: string, request: WriteRenderCacheRequest): Promise<void>;
   invalidateCache(vaultRoot: string, relPaths: readonly string[]): Promise<void>;
+  clearCache(vaultRoot: string): Promise<void>;
 }
 
 const defaultPersistence: VaultStatePersistence = {
@@ -443,7 +448,8 @@ const defaultPersistence: VaultStatePersistence = {
   saveState: saveVaultState,
   readCache: readRenderCache,
   writeCache: writeRenderCache,
-  invalidateCache: invalidateRenderCache
+  invalidateCache: invalidateRenderCache,
+  clearCache: clearRenderCache
 };
 
 export class VaultStateManager {
@@ -482,6 +488,10 @@ export class VaultStateManager {
 
   async invalidateRenderCache(relPaths: readonly string[]): Promise<void> {
     await this.cacheQueue.run(() => this.persistence.invalidateCache(this.vaultRoot, relPaths));
+  }
+
+  async clearRenderCache(): Promise<void> {
+    await this.cacheQueue.run(() => this.persistence.clearCache(this.vaultRoot));
   }
 
   getState(): VaultStateFileV1 {

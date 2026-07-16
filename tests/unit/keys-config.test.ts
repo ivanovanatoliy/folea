@@ -13,6 +13,7 @@ const known = new Set([
   'document.scrollHalfDown',
   'view.toggleTree',
   'editor.open',
+  'cache.clearApplication',
   'caret.moveDown'
 ]);
 
@@ -38,6 +39,14 @@ const defaults = (): KeymapSet => ({
 });
 
 describe('keys.config parser', () => {
+  it('places cache command overrides in the global keymap', () => {
+    const parsed = parseKeysConfig('cache.clearApplication C', known);
+    const result = applyKeysConfigOverrides(defaults(), parsed);
+
+    expect(result.warnings).toEqual([]);
+    expect(result.keymaps.global.get('C')).toBe('cache.clearApplication');
+  });
+
   it('keeps global remaps working when the templates keymap is present', () => {
     const defaultsWithTemplates: KeymapSet = {
       ...defaults(),
@@ -90,6 +99,14 @@ describe('keys.config parser', () => {
   it('accepts multi-key sequences as chord tokens', () => {
     expect(isValidChord('gg')).toBe(true);
     expect(parseKeysConfig('document.scrollLineDown gg', known).overrides[0]?.chord).toBe('gg');
+  });
+
+  it('accepts space chords', () => {
+    expect(isValidChord('Space')).toBe(true);
+    expect(isValidChord('<S-Space>')).toBe(true);
+    expect(parseKeysConfig('document.scrollHalfDown Space', known).overrides[0]?.chord).toBe(
+      'Space'
+    );
   });
 });
 

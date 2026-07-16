@@ -30,8 +30,7 @@
     ],
     "mac": {
       "target": [
-        "dmg",
-        "zip"
+        "dmg"
       ],
       "icon": "assets/brand/folea-icon.svg"
     },
@@ -58,7 +57,7 @@
     "package": "npm run build && electron-builder --publish never",
     "package:dir": "npm run build && electron-builder --dir --publish never",
     "package:linux:appimage": "npm run build && electron-builder --linux AppImage --publish never",
-    "package:all": "npm run build && electron-builder --linux AppImage deb --win nsis --mac dmg zip --publish never",
+    "package:all": "npm run build && electron-builder --linux AppImage deb --win nsis --mac dmg --publish never",
     "app:install": "npm run package:dir && node scripts/install-unpacked.mjs",
     "app:uninstall": "node scripts/uninstall-unpacked.mjs",
     "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",

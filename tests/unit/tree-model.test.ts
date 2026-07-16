@@ -88,6 +88,26 @@ describe('tree model', () => {
     ]);
   });
 
+  it('hides files and folders when any path segment starts with a dot', () => {
+    const tree = buildTree(
+      [
+        note('.hidden.typ'),
+        note('.hidden/nested.typ'),
+        note('visible/.hidden.typ'),
+        note('visible/shown.typ')
+      ],
+      [
+        { relPath: '.empty', name: '.empty' },
+        { relPath: 'visible/.nested', name: '.nested' }
+      ]
+    );
+
+    expect(flattenTree(tree, new Set()).map((row) => row.relPath)).toEqual([
+      'visible',
+      'visible/shown.typ'
+    ]);
+  });
+
   it('collects every folder and resolves the ancestors of a note', () => {
     const tree = buildTree([note('projects/nested/beta.typ'), note('archive/old.typ')]);
 

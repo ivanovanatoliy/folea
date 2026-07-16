@@ -6,6 +6,8 @@ import { getCommand, listPaletteCommands, listRemappableCommands } from '../../s
 const paletteCommandIds = [
   'app.closeVault',
   'app.openVault',
+  'cache.clearApplication',
+  'cache.clearCurrentVault',
   'caret.smartJump',
   'caret.toggle',
   'document.links',

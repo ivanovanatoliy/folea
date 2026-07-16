@@ -8,36 +8,32 @@
   background: var(--folea-surface-muted);
   color: var(--folea-text);
   margin: 0;
-  font: 14px var(--folea-font-mono);
+  font: 13px var(--folea-font-mono);
   line-height: 1;
 }
 
 .statusline-doc {
-  transform: translateY(2px);
   display: inline-block;
   color: var(--folea-text);
 }
 
 .statusline-mode {
-  transform: translateY(2px);
   display: inline-block;
   color: var(--folea-text);
 }
 
 .statusline-page {
-  transform: translateY(2px);
   display: inline-block;
   margin-left: auto;
   color: var(--folea-text);
 }
 
 .statusline-vault {
-  transform: translateY(2px);
   color: var(--folea-text);
 }
 
 .statusline-zoom {
-  transform: translateY(2px);
+  /* transform: translateY(2px); */
   color: var(--folea-text);
 }
 

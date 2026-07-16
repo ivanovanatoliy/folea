@@ -290,6 +290,10 @@ const makeSetup = (overrideKeymap?: Map<string, string>) => {
       useDark: vi.fn().mockResolvedValue(undefined),
       cycle: vi.fn().mockResolvedValue(undefined)
     },
+    cache: {
+      clearCurrentVault: vi.fn().mockResolvedValue(undefined),
+      clearApplication: vi.fn().mockResolvedValue(undefined)
+    },
     quickOpen: {
       open: vi.fn(),
       close: vi.fn(),
@@ -409,6 +413,28 @@ describe('chord normalization', () => {
     expect(normalizeChord({ key: 'Enter', ctrlKey: false, altKey: false, metaKey: false })).toBe(
       'Enter'
     );
+  });
+
+  it('normalizes space and Shift+Space as named chords', () => {
+    expect(
+      normalizeChord({
+        key: ' ',
+        code: 'Space',
+        ctrlKey: false,
+        altKey: false,
+        metaKey: false
+      })
+    ).toBe('Space');
+    expect(
+      normalizeChord({
+        key: ' ',
+        code: 'Space',
+        ctrlKey: false,
+        altKey: false,
+        metaKey: false,
+        shiftKey: true
+      })
+    ).toBe('<S-Space>');
   });
 
   it('modifier-only event returns null', () => {
@@ -578,6 +604,14 @@ describe('headless dispatch — document commands', () => {
     const { scrollByViewport, dispatcher } = makeSetup();
     expect(dispatcher.dispatch('<C-u>')).toBe('handled');
     expect(scrollByViewport).toHaveBeenCalledWith(-0.5);
+  });
+
+  it('Space and Shift+Space scroll by half a viewport in opposite directions', () => {
+    const { scrollByViewport, dispatcher } = makeSetup();
+    expect(dispatcher.dispatch('Space')).toBe('handled');
+    expect(dispatcher.dispatch('<S-Space>')).toBe('handled');
+    expect(scrollByViewport).toHaveBeenNthCalledWith(1, 0.5);
+    expect(scrollByViewport).toHaveBeenNthCalledWith(2, -0.5);
   });
 
   it('G → scrollToEnd', () => {

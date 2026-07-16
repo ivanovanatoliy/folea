@@ -3,7 +3,7 @@ import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from
 import { LinksOverlay } from './LinksOverlay';
 import { Logo } from './Logo';
 import { OutlineOverlay } from './OutlineOverlay';
-import { OperationNotice, type OperationNoticeValue } from './OperationNotice';
+import { Notification, type NotificationValue } from './Notification';
 import { PaletteOverlay } from './PaletteOverlay';
 import { QuickOpenOverlay, type QuickOpenMode } from './QuickOpenOverlay';
 import { StatusLine } from './StatusLine';
@@ -18,6 +18,7 @@ import {
   flattenTree,
   getFolderAncestors,
   getParentFolderPath,
+  isVisibleTreePath,
   pruneTreeMarks,
   toggleTreeMark,
   type TreeRow
@@ -49,6 +50,7 @@ import {
   TREE_KEYMAP
 } from '../input';
 import type {
+  CacheView,
   Command,
   CommandContext,
   DocumentView,
@@ -222,7 +224,7 @@ export const AppRuntime = () => {
   const [selectedTemplateIndex, setSelectedTemplateIndex] = createSignal(0);
   const [vaultDialogRequest, setVaultDialogRequest] = createSignal<VaultOperationDialogRequest>();
   const [vaultDialogParentContext, setVaultDialogParentContext] = createSignal<InputContextName>();
-  const [operationNotice, setOperationNotice] = createSignal<OperationNoticeValue>();
+  const [notification, setNotification] = createSignal<NotificationValue>();
   const [treeContextMenuOpen, setTreeContextMenuOpen] = createSignal(false);
   const [templateContextMenuOpen, setTemplateContextMenuOpen] = createSignal(false);
 
@@ -318,7 +320,10 @@ export const AppRuntime = () => {
       (activeContext() === 'vault-dialog' && vaultDialogParentContext() === 'templates')
   );
   const quickOpenVisible = createMemo(() => activeContext() === 'quick-open');
-  const treeRoot = createMemo(() => buildTree(notes(), directories()));
+  const visibleTreeNotes = createMemo(() =>
+    notes().filter((note) => isVisibleTreePath(note.relPath))
+  );
+  const treeRoot = createMemo(() => buildTree(visibleTreeNotes(), directories()));
   const treeRows = createMemo(() => flattenTree(treeRoot(), collapsedFolders()));
   const visibleTreeRows = createMemo(() => {
     const query = treeSearchQuery().trim().toLowerCase();
@@ -326,7 +331,7 @@ export const AppRuntime = () => {
       return treeRows();
     }
 
-    return notes()
+    return visibleTreeNotes()
       .filter((note) => {
         const haystack = `${note.title} ${note.relPath}`.toLowerCase();
         return haystack.includes(query);
@@ -633,14 +638,14 @@ export const AppRuntime = () => {
   };
 
   const reportOperationError = (error: unknown): void => {
-    setOperationNotice({
+    setNotification({
       tone: 'error',
       message: error instanceof Error ? error.message : String(error)
     });
   };
 
   const reportOperationWarnings = (warnings: readonly string[]): void => {
-    if (warnings.length > 0) setOperationNotice({ tone: 'warning', message: warnings.join('\n') });
+    if (warnings.length > 0) setNotification({ tone: 'warning', message: warnings.join('\n') });
   };
 
   const requestVaultDialog = (
@@ -649,7 +654,7 @@ export const AppRuntime = () => {
     new Promise((resolve) => {
       resolveVaultDialog?.(undefined);
       resolveVaultDialog = resolve;
-      setOperationNotice(undefined);
+      setNotification(undefined);
       setVaultDialogRequest(request);
       openVaultDialogContext();
     });
@@ -1402,6 +1407,34 @@ export const AppRuntime = () => {
       }
     };
 
+    const cacheView: CacheView = {
+      clearCurrentVault: async () => {
+        warmupQueue.cancel();
+        clearPrefetchTimer();
+        try {
+          const result = await window.folea.cache.clearCurrentVault();
+          if (result.status === 'no-vault') {
+            setNotification({ tone: 'warning', message: 'No vault is open' });
+            return;
+          }
+
+          for (const note of notes()) surface?.invalidate(note.relPath);
+          setWarmupMessage(undefined);
+          setNotification({ tone: 'success', message: 'Current vault cache cleared' });
+        } catch (error) {
+          reportOperationError(error);
+        }
+      },
+      clearApplication: async () => {
+        try {
+          await window.folea.cache.clearApplication();
+          setNotification({ tone: 'success', message: 'Application cache cleared' });
+        } catch (error) {
+          reportOperationError(error);
+        }
+      }
+    };
+
     const linksView: LinksView = {
       open: () => {
         if (startupState() !== 'vault-open') return;
@@ -1457,6 +1490,7 @@ export const AppRuntime = () => {
       caret: caretView,
       editor: editorView,
       theme: themeView,
+      cache: cacheView,
       zoom: zoomView,
       outline: outlineView,
       links: linksView,
@@ -1867,10 +1901,7 @@ export const AppRuntime = () => {
             vaultDialogActions = actions;
           }}
         />
-        <OperationNotice
-          notice={operationNotice()}
-          onDismiss={() => setOperationNotice(undefined)}
-        />
+        <Notification value={notification()} onExpire={() => setNotification(undefined)} />
         <PaletteOverlay
           visible={paletteVisible()}
           modeLabel="palette"

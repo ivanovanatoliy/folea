@@ -1,6 +1,24 @@
 import { registerCommand } from '../commands';
 
 registerCommand({
+  id: 'cache.clearApplication',
+  exposure: 'action',
+  title: 'Clear application cache',
+  run: (ctx) => {
+    void ctx.cache.clearApplication();
+  }
+});
+
+registerCommand({
+  id: 'cache.clearCurrentVault',
+  exposure: 'action',
+  title: 'Clear current vault cache',
+  run: (ctx) => {
+    void ctx.cache.clearCurrentVault();
+  }
+});
+
+registerCommand({
   id: 'editor.open',
   exposure: 'action',
   title: 'Open in editor',

@@ -9,6 +9,7 @@ export { createContextStack } from './context-stack';
 export type {
   DocumentView,
   CaretView,
+  CacheView,
   EditorView,
   ThemeView,
   TreeView,

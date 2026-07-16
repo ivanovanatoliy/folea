@@ -55,6 +55,7 @@ const CONTEXT_BY_COMMAND_NAMESPACE = new Map<string, keyof KeymapSet>([
   ['zoom', 'document'],
   ['editor', 'document'],
   ['app', 'global'],
+  ['cache', 'global'],
   ['theme', 'global'],
   ['templates', 'templates']
 ]);
@@ -63,6 +64,7 @@ const NAMED_KEYS = new Set([
   'Enter',
   'Escape',
   'Backspace',
+  'Space',
   'Tab',
   'ArrowUp',
   'ArrowDown',
@@ -103,6 +105,12 @@ export const isValidChord = (chord: string): boolean => {
 
   while (index < chord.length) {
     const rest = chord.slice(index);
+    if (rest.startsWith('<S-Space>')) {
+      index += '<S-Space>'.length;
+      tokenCount++;
+      continue;
+    }
+
     if (rest.startsWith('<C-')) {
       const close = rest.indexOf('>');
       if (close < 0) return false;

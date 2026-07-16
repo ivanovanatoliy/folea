@@ -6,6 +6,8 @@ export type BindingIndex = Map<string, string>;
 const CHORD_LABELS: Record<string, string> = {
   Escape: 'Esc',
   Enter: '↵',
+  Space: 'Space',
+  '<S-Space>': 'Shift+Space',
   ArrowUp: '↑',
   ArrowDown: '↓',
   ArrowLeft: '←',

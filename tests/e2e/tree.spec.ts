@@ -6,6 +6,48 @@ import { cleanupApp, currentEnv, expectSurfaceRendered, launchApp } from './supp
 
 test.afterEach(cleanupApp);
 
+test('hides dot-prefixed files and folders from the tree', async () => {
+  const vaultRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'folea-e2e-hidden-tree-'));
+  await fs.mkdir(path.join(vaultRoot, '.hidden-folder'));
+  await fs.mkdir(path.join(vaultRoot, 'visible', '.nested-hidden'), { recursive: true });
+  await fs.writeFile(path.join(vaultRoot, 'visible.typ'), '= Visible\n', 'utf8');
+  await fs.writeFile(path.join(vaultRoot, '.hidden.typ'), '= Hidden\n', 'utf8');
+  await fs.writeFile(
+    path.join(vaultRoot, '.hidden-folder', 'nested.typ'),
+    '= Hidden nested\n',
+    'utf8'
+  );
+  await fs.writeFile(
+    path.join(vaultRoot, 'visible', '.nested-hidden', 'note.typ'),
+    '= Hidden nested note\n',
+    'utf8'
+  );
+
+  try {
+    const app = await launchApp({
+      ...currentEnv(),
+      FOLEA_ALLOW_TEST_VAULT_OPEN: '1',
+      FOLEA_TEST_VAULT_PATH: vaultRoot
+    });
+    const page = await app.firstWindow();
+    await expectSurfaceRendered(page);
+
+    await page.keyboard.press('Control+b');
+    await expect(page.getByTestId('tree-overlay')).toBeVisible();
+    await expect(
+      page.locator('[data-testid="tree-row"][data-relpath="visible.typ"]')
+    ).toBeVisible();
+    await expect(page.locator('[data-testid="tree-row"][data-relpath^="."]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="tree-row"][data-relpath*="/."]')).toHaveCount(0);
+
+    await page.keyboard.press('/');
+    await page.keyboard.type('hidden');
+    await expect(page.getByTestId('tree-row')).toHaveCount(0);
+  } finally {
+    await fs.rm(vaultRoot, { recursive: true, force: true });
+  }
+});
+
 test('creates notes and directories through the real tree UI and dismisses its context menu', async () => {
   const vaultRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'folea-e2e-management-'));
   await fs.mkdir(path.join(vaultRoot, '_templates'));
@@ -115,8 +157,8 @@ test('creates notes and directories through the real tree UI and dismisses its c
     await page.getByTestId('vault-dialog-input').fill('context-note');
     await page.getByTestId('vault-dialog-submit').click();
     await page.getByTestId('vault-dialog-submit').click();
-    await expect(page.getByTestId('operation-notice')).toBeVisible();
-    await page.getByRole('button', { name: 'Dismiss notification' }).click();
+    await expect(page.getByTestId('notification')).toBeVisible();
+    await expect(page.getByTestId('notification').getByRole('button')).toHaveCount(0);
 
     await page.getByTestId('tree-root-drop').click({ button: 'right' });
     await page.getByRole('button', { name: 'create directory', exact: true }).click();

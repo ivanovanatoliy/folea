@@ -74,9 +74,13 @@ test('opens a shell-metacharacter note path as one editor argument', async () =>
     await expect(page.getByTestId('palette-row').first()).toContainText('Open in editor');
     await page.keyboard.press('Enter');
 
+    const expectedPath = await fs.realpath(path.join(vaultRoot, noteName));
     await expect
-      .poll(() => fs.readFile(resultPath, 'utf8').catch(() => null))
-      .toBe(path.join(vaultRoot, noteName));
+      .poll(async () => {
+        const capturedPath = await fs.readFile(resultPath, 'utf8').catch(() => null);
+        return capturedPath ? fs.realpath(capturedPath) : null;
+      })
+      .toBe(expectedPath);
     await expect
       .poll(() =>
         fs
@@ -86,6 +90,7 @@ test('opens a shell-metacharacter note path as one editor argument', async () =>
       )
       .toBe(false);
   } finally {
+    await cleanupApp();
     await fs.rm(vaultRoot, { recursive: true, force: true });
     await fs.rm(helperRoot, { recursive: true, force: true });
     await fs.rm(injectionMarker, { force: true });

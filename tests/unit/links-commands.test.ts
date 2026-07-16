@@ -80,6 +80,10 @@ const makeContext = (links: LinksView): CommandContext => ({
     useDark: vi.fn().mockResolvedValue(undefined),
     cycle: vi.fn().mockResolvedValue(undefined)
   },
+  cache: {
+    clearCurrentVault: vi.fn().mockResolvedValue(undefined),
+    clearApplication: vi.fn().mockResolvedValue(undefined)
+  },
   zoom: {
     fitWidth: vi.fn(),
     fitContentWidth: vi.fn(),

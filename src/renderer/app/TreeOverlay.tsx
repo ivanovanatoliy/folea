@@ -96,9 +96,8 @@ export const TreeOverlay = (props: TreeOverlayProps) => {
       const insideMenu = target.closest('.tree-context-menu') !== null;
       const insideTree = target.closest('.tree-overlay') !== null;
       const insideDialog = target.closest('.vault-dialog-backdrop') !== null;
-      const insideNotice = target.closest('.operation-notice') !== null;
       if (menu() && !insideMenu) closeContextMenu();
-      if (!insideTree && !insideMenu && !insideDialog && !insideNotice) {
+      if (!insideTree && !insideMenu && !insideDialog) {
         props.onCloseRequest?.();
       }
     };
