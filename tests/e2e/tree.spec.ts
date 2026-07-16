@@ -115,8 +115,8 @@ test('creates notes and directories through the real tree UI and dismisses its c
     await page.getByTestId('vault-dialog-input').fill('context-note');
     await page.getByTestId('vault-dialog-submit').click();
     await page.getByTestId('vault-dialog-submit').click();
-    await expect(page.getByTestId('operation-notice')).toBeVisible();
-    await page.getByRole('button', { name: 'Dismiss notification' }).click();
+    await expect(page.getByTestId('notification')).toBeVisible();
+    await expect(page.getByTestId('notification').getByRole('button')).toHaveCount(0);
 
     await page.getByTestId('tree-root-drop').click({ button: 'right' });
     await page.getByRole('button', { name: 'create directory', exact: true }).click();

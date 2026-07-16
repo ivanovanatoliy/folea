@@ -24,7 +24,8 @@ describe('VaultStateManager concurrency', () => {
       },
       readCache: async (): Promise<ReadRenderCacheResponse> => ({ hit: false, reason: 'missing' }),
       writeCache: async () => undefined,
-      invalidateCache: async () => undefined
+      invalidateCache: async () => undefined,
+      clearCache: async () => undefined
     };
     const manager = new VaultStateManager('/vault', persistence);
     await manager.load();
@@ -64,7 +65,8 @@ describe('VaultStateManager concurrency', () => {
         return { hit: false, reason: 'missing' };
       },
       writeCache: async () => transaction('write'),
-      invalidateCache: async () => transaction('invalidate')
+      invalidateCache: async () => transaction('invalidate'),
+      clearCache: async () => transaction('clear')
     };
     const manager = new VaultStateManager('/vault', persistence);
     const request: WriteRenderCacheRequest = {
@@ -97,7 +99,8 @@ describe('VaultStateManager concurrency', () => {
     await Promise.all([
       manager.writeRenderCache(request),
       manager.readRenderCache({ relPath: 'note.typ' }),
-      manager.invalidateRenderCache(['note.typ'])
+      manager.invalidateRenderCache(['note.typ']),
+      manager.clearRenderCache()
     ]);
 
     expect(maxActive).toBe(1);
@@ -107,7 +110,9 @@ describe('VaultStateManager concurrency', () => {
       'read:start',
       'read:end',
       'invalidate:start',
-      'invalidate:end'
+      'invalidate:end',
+      'clear:start',
+      'clear:end'
     ]);
   });
 });

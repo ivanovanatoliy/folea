@@ -1,4 +1,12 @@
-import { app, BrowserWindow, dialog, ipcMain, shell, type OpenDialogOptions } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  session,
+  shell,
+  type OpenDialogOptions
+} from 'electron';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 
@@ -62,6 +70,12 @@ import {
   parseAppStateFileV1
 } from '../shared/ipc/app-state';
 import {
+  CACHE_CLEAR_APPLICATION_CHANNEL,
+  CACHE_CLEAR_CURRENT_VAULT_CHANNEL,
+  parseCacheClearInvokeRequest,
+  parseCacheClearResponse
+} from '../shared/ipc/cache';
+import {
   VAULT_STATE_LOAD_CHANNEL,
   VAULT_STATE_UPDATE_CHANNEL,
   VAULT_STATE_READ_RENDER_CACHE_CHANNEL,
@@ -84,6 +98,7 @@ import { vaultService } from './vault/service';
 import { loadAppState, updateAppState } from './app-state';
 import { VaultStateManager } from './vault-state';
 import { loadKeysConfigContent, loadResolvedPrefs, setScopedThemePreference } from './config';
+import { clearApplicationCache } from './cache';
 
 let vaultBroadcastUnsubscribe: (() => void) | undefined;
 let cleanupRegistered = false;
@@ -190,6 +205,27 @@ export const registerIpcHandlers = (): void => {
   ipcMain.handle(APP_STATE_REMOVE_RECENT_CHANNEL, async (_event, request: unknown) => {
     const patch = parseRemoveRecentVaultRequest(request);
     return parseAppStateFileV1(await updateAppState(patch));
+  });
+
+  // ── Cache ──────────────────────────────────────────────────────────────────
+
+  ipcMain.removeHandler(CACHE_CLEAR_CURRENT_VAULT_CHANNEL);
+  ipcMain.handle(CACHE_CLEAR_CURRENT_VAULT_CHANNEL, async (_event, request: unknown) => {
+    parseCacheClearInvokeRequest(request, CACHE_CLEAR_CURRENT_VAULT_CHANNEL);
+    const manager = vaultStateManager;
+    if (!manager) {
+      return parseCacheClearResponse({ scope: 'current-vault', status: 'no-vault' });
+    }
+
+    await manager.clearRenderCache();
+    return parseCacheClearResponse({ scope: 'current-vault', status: 'cleared' });
+  });
+
+  ipcMain.removeHandler(CACHE_CLEAR_APPLICATION_CHANNEL);
+  ipcMain.handle(CACHE_CLEAR_APPLICATION_CHANNEL, async (_event, request: unknown) => {
+    parseCacheClearInvokeRequest(request, CACHE_CLEAR_APPLICATION_CHANNEL);
+    await clearApplicationCache(session.defaultSession);
+    return parseCacheClearResponse({ scope: 'application', status: 'cleared' });
   });
 
   // ── Vault state ──────────────────────────────────────────────────────────────

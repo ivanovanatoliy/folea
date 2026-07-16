@@ -290,6 +290,10 @@ const makeSetup = (overrideKeymap?: Map<string, string>) => {
       useDark: vi.fn().mockResolvedValue(undefined),
       cycle: vi.fn().mockResolvedValue(undefined)
     },
+    cache: {
+      clearCurrentVault: vi.fn().mockResolvedValue(undefined),
+      clearApplication: vi.fn().mockResolvedValue(undefined)
+    },
     quickOpen: {
       open: vi.fn(),
       close: vi.fn(),

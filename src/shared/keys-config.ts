@@ -55,6 +55,7 @@ const CONTEXT_BY_COMMAND_NAMESPACE = new Map<string, keyof KeymapSet>([
   ['zoom', 'document'],
   ['editor', 'document'],
   ['app', 'global'],
+  ['cache', 'global'],
   ['theme', 'global'],
   ['templates', 'templates']
 ]);

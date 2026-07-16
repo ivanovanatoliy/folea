@@ -110,15 +110,13 @@
   background: #b42318;
 }
 
-.operation-notice {
+.notification {
   position: absolute;
   z-index: 120;
   right: 16px;
   bottom: 40px;
-  display: flex;
   max-width: min(520px, calc(100vw - 32px));
-  gap: 12px;
-  align-items: start;
+  pointer-events: none;
   padding: 10px 12px;
   border: 1px solid var(--folea-border-strong);
   background: var(--folea-elevated);
@@ -133,23 +131,18 @@
     monospace;
 }
 
-.operation-notice-error {
+.notification-error {
   border-color: #b42318;
 }
 
-.operation-notice-warning {
+.notification-warning {
   border-color: #b54708;
 }
 
-.operation-notice-message {
-  white-space: pre-wrap;
+.notification-success {
+  border-color: #16803c;
 }
 
-.operation-notice button {
-  flex: 0 0 auto;
-  padding: 2px 5px;
-  border: 1px solid var(--folea-border-strong);
-  background: transparent;
-  color: inherit;
-  font: inherit;
+.notification-message {
+  white-space: pre-wrap;
 }

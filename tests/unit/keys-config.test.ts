@@ -13,6 +13,7 @@ const known = new Set([
   'document.scrollHalfDown',
   'view.toggleTree',
   'editor.open',
+  'cache.clearApplication',
   'caret.moveDown'
 ]);
 
@@ -38,6 +39,14 @@ const defaults = (): KeymapSet => ({
 });
 
 describe('keys.config parser', () => {
+  it('places cache command overrides in the global keymap', () => {
+    const parsed = parseKeysConfig('cache.clearApplication C', known);
+    const result = applyKeysConfigOverrides(defaults(), parsed);
+
+    expect(result.warnings).toEqual([]);
+    expect(result.keymaps.global.get('C')).toBe('cache.clearApplication');
+  });
+
   it('keeps global remaps working when the templates keymap is present', () => {
     const defaultsWithTemplates: KeymapSet = {
       ...defaults(),

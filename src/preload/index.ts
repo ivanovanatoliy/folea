@@ -12,6 +12,13 @@ import {
   parseRemoveRecentVaultRequest,
   type AppStateFileV1
 } from '../shared/ipc/app-state';
+import {
+  CACHE_CLEAR_APPLICATION_CHANNEL,
+  CACHE_CLEAR_CURRENT_VAULT_CHANNEL,
+  parseCacheClearRequestArgs,
+  parseCacheClearResponse,
+  type CacheClearResponse
+} from '../shared/ipc/cache';
 import { EDITOR_OPEN_CHANNEL, validateEditorOpenRelPath } from '../shared/ipc/editor';
 import {
   KEYS_CONFIG_LOAD_CHANNEL,
@@ -144,6 +151,19 @@ const bridge: FoleaBridge = Object.freeze({
       const validated = parseRemoveRecentVaultRequest({ type: 'removeRecentVault', rootPath });
       const response = await ipcRenderer.invoke(APP_STATE_REMOVE_RECENT_CHANNEL, validated);
       return parseAppStateFileV1(response);
+    }
+  }),
+
+  cache: Object.freeze({
+    clearCurrentVault: async (...args: []): Promise<CacheClearResponse> => {
+      const request = parseCacheClearRequestArgs(args, CACHE_CLEAR_CURRENT_VAULT_CHANNEL);
+      const response = await ipcRenderer.invoke(CACHE_CLEAR_CURRENT_VAULT_CHANNEL, request);
+      return parseCacheClearResponse(response);
+    },
+    clearApplication: async (...args: []): Promise<CacheClearResponse> => {
+      const request = parseCacheClearRequestArgs(args, CACHE_CLEAR_APPLICATION_CHANNEL);
+      const response = await ipcRenderer.invoke(CACHE_CLEAR_APPLICATION_CHANNEL, request);
+      return parseCacheClearResponse(response);
     }
   }),
 

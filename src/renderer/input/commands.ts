@@ -147,12 +147,18 @@ export interface ThemeView {
   cycle(): Promise<void>;
 }
 
+export interface CacheView {
+  clearCurrentVault(): Promise<void>;
+  clearApplication(): Promise<void>;
+}
+
 export interface CommandContext {
   readonly document: DocumentView;
   readonly contexts: ContextStack;
   readonly caret: CaretView;
   readonly editor: EditorView;
   readonly theme: ThemeView;
+  readonly cache: CacheView;
   readonly zoom: ZoomView;
   readonly outline: OutlineView;
   readonly links: LinksView;

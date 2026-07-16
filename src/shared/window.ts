@@ -1,5 +1,6 @@
 import type { FoleaAppBridge } from './ipc/app';
 import type { AppStateFileV1 } from './ipc/app-state';
+import type { FoleaCacheBridge } from './ipc/cache';
 import type { FoleaEditorBridge } from './ipc/editor';
 import type { KeysConfigLoadResponse } from './ipc/keys-config';
 import type { FoleaSearchBridge } from './ipc/search';
@@ -45,6 +46,7 @@ export interface FoleaVaultBridgeExtended extends FoleaVaultBridge {
 export interface FoleaBridge {
   app: FoleaAppBridge;
   appState: FoleaAppStateBridge;
+  cache: FoleaCacheBridge;
   vaultState: FoleaVaultStateBridge;
   prefs: FoleaPrefsBridge;
   keysConfig: FoleaKeysConfigBridge;
