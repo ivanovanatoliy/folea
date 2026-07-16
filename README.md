@@ -46,7 +46,7 @@ npm run app:uninstall
 npm run package 
 ```
 
-Targets are Linux AppImage + deb, Windows NSIS, and macOS dmg + zip. Packages are unsigned — on
+Targets are Linux AppImage + deb, Windows NSIS, and macOS dmg. Packages are unsigned — on
 macOS use **Open Anyway** in System Settings → Privacy & Security (or
 `xattr -dr com.apple.quarantine`); on Windows SmartScreen may require **More info → Run anyway**.
 

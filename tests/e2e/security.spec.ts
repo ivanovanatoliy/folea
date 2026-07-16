@@ -25,13 +25,16 @@ test('opens the minimalist shell and bridge', async () => {
 
   await expect.poll(() => page.evaluate(() => window.folea.app.version())).toBe('0.0.0');
 
+  const unavailableVaultPath = path.join(os.tmpdir(), 'folea-should-not-open');
   await expect
     .poll(() =>
-      page.evaluate(() =>
-        window.folea.vault
-          .open('/tmp/folea-should-not-open')
-          .then(() => 'opened')
-          .catch((error: unknown) => (error instanceof Error ? error.message : String(error)))
+      page.evaluate(
+        (vaultPath) =>
+          window.folea.vault
+            .open(vaultPath)
+            .then(() => 'opened')
+            .catch((error: unknown) => (error instanceof Error ? error.message : String(error))),
+        unavailableVaultPath
       )
     )
     .toContain('only available in test mode');

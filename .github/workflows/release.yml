@@ -103,9 +103,7 @@ jobs:
             artifact-path: dist/*.exe
           - os: macos-15-intel
             artifact-name: folea-macos-x64
-            artifact-path: |
-              dist/*.dmg
-              dist/*.zip
+            artifact-path: dist/*.dmg
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -123,6 +121,9 @@ jobs:
         run: npm run package -- --x64
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - if: runner.os == 'Windows'
+        name: Smoke test Windows installer
+        run: node scripts/smoke-installed-windows.mjs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ matrix.artifact-name }}

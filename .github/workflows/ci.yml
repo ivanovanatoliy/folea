@@ -23,7 +23,39 @@ jobs:
       - run: npm run test:coverage
       - run: npm audit --audit-level=high
 
-  e2e:
+  e2e-pr:
+    name: E2E ${{ matrix.os }}
+    if: github.event_name == 'pull_request'
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:e2e:run
+      - if: runner.os != 'Linux'
+        run: npm run test:e2e:run
+      - if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-results-${{ matrix.os }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  e2e-main:
+    name: E2E ubuntu-latest after merge
+    if: github.event_name == 'push'
     needs: check
     runs-on: ubuntu-latest
     steps:
@@ -38,11 +70,43 @@ jobs:
       - if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: playwright-results
+          name: playwright-results-ubuntu-main
           path: |
             playwright-report/
             test-results/
           retention-days: 7
+
+  e2e:
+    name: e2e
+    if: always()
+    needs:
+      - check
+      - e2e-pr
+      - e2e-main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify platform E2E results
+        shell: bash
+        env:
+          CHECK_RESULT: ${{ needs.check.result }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_E2E_RESULT: ${{ needs.e2e-pr.result }}
+          MAIN_E2E_RESULT: ${{ needs.e2e-main.result }}
+        run: |
+          if [[ "$CHECK_RESULT" != "success" ]]; then
+            echo "Check job did not succeed: $CHECK_RESULT"
+            exit 1
+          fi
+
+          if [[ "$EVENT_NAME" == "pull_request" && "$PR_E2E_RESULT" != "success" ]]; then
+            echo "Pull request E2E matrix did not succeed: $PR_E2E_RESULT"
+            exit 1
+          fi
+
+          if [[ "$EVENT_NAME" == "push" && "$MAIN_E2E_RESULT" != "success" ]]; then
+            echo "Post-merge Linux E2E did not succeed: $MAIN_E2E_RESULT"
+            exit 1
+          fi
 
   build:
     needs: check
@@ -60,3 +124,6 @@ jobs:
       - run: npm run package
         env:
           DEBUG: electron-builder
+      - if: runner.os == 'Windows'
+        name: Smoke test Windows installer
+        run: node scripts/smoke-installed-windows.mjs
