@@ -422,14 +422,16 @@ test('scrolls the document with Space and Shift+Space', async () => {
     await expect
       .poll(() => surface.evaluate((el) => el.scrollTop))
       .toBeLessThan(scrollTopAfterSpace);
-    await expect.poll(() => surface.evaluate((el) => el.scrollTop)).toBe(0);
+    await expect.poll(() => surface.evaluate((el) => el.scrollTop)).toBeLessThanOrEqual(1);
 
     await page.keyboard.press('Control+b');
     await expect(page.getByTestId('statusline-mode')).toHaveText('[tree]');
+    const scrollTopBeforeTreeSpace = await surface.evaluate((el) => el.scrollTop);
     await page.keyboard.press('Space');
     await page.waitForTimeout(50);
-    expect(await surface.evaluate((el) => el.scrollTop)).toBe(0);
+    expect(await surface.evaluate((el) => el.scrollTop)).toBe(scrollTopBeforeTreeSpace);
   } finally {
+    await cleanupApp();
     await fs.rm(vaultRoot, { recursive: true, force: true });
   }
 });

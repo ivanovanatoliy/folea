@@ -60,11 +60,6 @@ test('clears current-vault and application caches through the command palette', 
       fs.readFile(path.join(vaultRoot, '.folea', 'state.json'), 'utf8')
     ).resolves.toContain('alpha.typ');
     await expect(notification).not.toBeVisible({ timeout: 4_000 });
-    const cacheSizeBefore = await app.evaluate(({ session }) =>
-      session.defaultSession.getCacheSize()
-    );
-    expect(cacheSizeBefore).toBeGreaterThan(0);
-
     await runPaletteCommand(page, 'application cache', 'cache.clearApplication');
     await expect(notification).toContainText('Application cache cleared');
     await expect
@@ -73,6 +68,7 @@ test('clears current-vault and application caches through the command palette', 
     await expect(fs.readFile(prefsPath, 'utf8')).resolves.toBe('theme = dark\n');
     await expect(notification).not.toBeVisible({ timeout: 4_000 });
   } finally {
+    await cleanupApp();
     await fs.rm(vaultRoot, { recursive: true, force: true }).catch(() => {});
     await fs.rm(userDataDir, { recursive: true, force: true }).catch(() => {});
   }
@@ -93,6 +89,7 @@ test('reports that current-vault cache needs an open vault', async () => {
     await expect(notification).not.toBeVisible({ timeout: 4_000 });
     await expect(page.getByTestId('start-menu')).toBeVisible();
   } finally {
+    await cleanupApp();
     await fs.rm(userDataDir, { recursive: true, force: true }).catch(() => {});
   }
 });

@@ -60,6 +60,7 @@ test('links panel: b opens overlay, shows backlinks + outgoing, Enter opens note
     await expectSurfaceRendered(page);
     await expect(page.getByTestId('typst-rendered-document')).toContainText('Beta');
   } finally {
+    await cleanupApp();
     await fs.rm(vaultRoot, { recursive: true, force: true });
   }
 });
@@ -95,6 +96,7 @@ test('links panel: Escape closes overlay without navigating', async () => {
     // Original note is still displayed
     await expect(page.getByTestId('typst-rendered-document')).toContainText('Main');
   } finally {
+    await cleanupApp();
     await fs.rm(vaultRoot, { recursive: true, force: true });
   }
 });
@@ -126,6 +128,7 @@ test('link click: extensionless ./ relative #link resolves and navigates to targ
     await expect(page.getByTestId('typst-rendered-document')).toContainText('From');
     await clickLinkAndExpect(page, 'Target note.');
   } finally {
+    await cleanupApp();
     await fs.rm(vaultRoot, { recursive: true, force: true });
   }
 });
@@ -159,6 +162,7 @@ test('link click: middle-click on #link navigates to target note (not system bro
       .poll(() => page.getByTestId('typst-rendered-document').textContent(), { timeout: 10_000 })
       .toContain('Target note.');
   } finally {
+    await cleanupApp();
     await fs.rm(vaultRoot, { recursive: true, force: true });
   }
 });
@@ -205,6 +209,7 @@ test('link click (dev server): clicking a rendered #link opens the target note i
       .poll(() => page.getByTestId('typst-rendered-document').textContent(), { timeout: 10_000 })
       .toContain('Target note.');
   } finally {
+    await cleanupApp();
     await devServer?.close();
     await fs.rm(vaultRoot, { recursive: true, force: true });
   }

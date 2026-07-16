@@ -30,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-15-intel]
+        os: [ubuntu-latest, windows-latest, macos-15-intel, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -39,6 +39,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Prepare Electron binary
+        run: node -e "console.log(require('electron'))"
       - run: npm run build
       - if: runner.os == 'Linux'
         run: xvfb-run -a npm run test:e2e:run
@@ -65,6 +67,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Prepare Electron binary
+        run: node -e "console.log(require('electron'))"
       - run: npm run build
       - run: xvfb-run -a npm run test:e2e:run
       - if: failure()
