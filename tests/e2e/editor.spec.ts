@@ -7,20 +7,30 @@ import { cleanupApp, currentEnv, expectSurfaceRendered, launchApp } from './supp
 test.afterEach(cleanupApp);
 
 test('editor commands appear in the command palette', async () => {
-  const app = await launchApp();
-  const page = await app.firstWindow();
+  const vaultRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'folea-e2e-editor-vault-'));
+  await fs.writeFile(path.join(vaultRoot, 'note.typ'), '= Editor palette\n', 'utf8');
 
-  await expect(page.getByTestId('folea-shell')).toBeVisible();
+  try {
+    const app = await launchApp({
+      ...currentEnv(),
+      FOLEA_ALLOW_TEST_VAULT_OPEN: '1',
+      FOLEA_TEST_VAULT_PATH: vaultRoot
+    });
+    const page = await app.firstWindow();
+    await expectSurfaceRendered(page);
 
-  await page.keyboard.press(':');
-  await expect(page.getByTestId('statusline-mode')).toHaveText('[palette]');
+    await page.keyboard.press(':');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[palette]');
 
-  await page.keyboard.type('Open in editor');
-  await expect
-    .poll(() => page.getByTestId('palette-results').textContent())
-    .toContain('Open in editor');
+    await page.keyboard.type('Open in editor');
+    await expect
+      .poll(() => page.getByTestId('palette-results').textContent())
+      .toContain('Open in editor');
 
-  await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+  } finally {
+    await fs.rm(vaultRoot, { recursive: true, force: true }).catch(() => {});
+  }
 });
 
 test('editor.open rejects invalid relPath in the preload', async () => {
