@@ -13,6 +13,7 @@
   "depends": "versions/nodejs22",
   "installer": {
     "script": [
+      "Push-Location $dir",
       "$env:CSC_IDENTITY_AUTO_DISCOVERY = 'false'",
       "$env:FOLEA_COMMIT_SHA = '__FULL_SHA__'",
       "$env:FOLEA_COMMIT_COUNT = '__COMMIT_COUNT__'",
@@ -25,6 +26,7 @@
       "npm version $builtVersion --no-git-tag-version --allow-same-version",
       "npm run build",
       "npx electron-builder --dir --win --x64 --publish never",
+      "Pop-Location",
       "Move-Item -LiteralPath (Join-Path $dir 'dist\\win-unpacked') -Destination (Join-Path $dir 'app')",
       "Get-ChildItem -LiteralPath $dir -Force | Where-Object Name -ne 'app' | Remove-Item -Recurse -Force"
     ]

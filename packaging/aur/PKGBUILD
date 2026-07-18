@@ -38,6 +38,7 @@ build() {
 package() {
   install -d "$pkgdir/opt/folea"
   cp -a "$srcdir/folea/dist/linux-unpacked/." "$pkgdir/opt/folea/"
+  chmod 4755 "$pkgdir/opt/folea/chrome-sandbox"
   install -Dm755 "$srcdir/folea.sh" "$pkgdir/usr/bin/folea"
   install -Dm644 "$srcdir/folea.desktop" "$pkgdir/usr/share/applications/folea.desktop"
   install -Dm644 "$srcdir/folea/assets/logo/app-icon-dark.svg" \
