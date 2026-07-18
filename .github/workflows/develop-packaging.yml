@@ -52,7 +52,7 @@ jobs:
           echo "timestamp=$timestamp" >> "$GITHUB_OUTPUT"
           echo "commit_count=$count" >> "$GITHUB_OUTPUT"
           echo "short_sha=$short" >> "$GITHUB_OUTPUT"
-      - name: Render immutable Scoop manifest
+      - name: Render immutable package manifests
         shell: bash
         env:
           FOLEA_VERSION: ${{ steps.metadata.outputs.version }}
@@ -65,13 +65,20 @@ jobs:
             "https://github.com/$GITHUB_REPOSITORY/archive/$GITHUB_SHA.zip" \
             --output source.zip
           export FOLEA_ARCHIVE_SHA256="$(sha256sum source.zip | cut -d' ' -f1)"
-          mkdir scoop-manifest
+          mkdir scoop-manifest homebrew-cask
           node scripts/render-scoop-manifest.mjs scoop-manifest/folea-dev.json
+          node scripts/render-homebrew-cask.mjs homebrew-cask/folea-dev.rb
           cp packaging/scoop/nodejs22.json scoop-manifest/nodejs22.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: scoop-manifest
           path: scoop-manifest/
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: homebrew-cask
+          path: homebrew-cask/
           if-no-files-found: error
           retention-days: 7
 
@@ -253,12 +260,17 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Install HEAD formula
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: homebrew-cask
+          path: homebrew-cask
+      - name: Install HEAD formula and Spotlight cask
         shell: bash
         run: |
           tap="$(brew --repository)/Library/Taps/ivanovanatoliy/homebrew-folea"
-          mkdir -p "$tap/Formula"
+          mkdir -p "$tap/Formula" "$tap/Casks"
           cp packaging/homebrew/Formula/folea.rb "$tap/Formula/folea.rb"
+          cp homebrew-cask/folea-dev.rb "$tap/Casks/folea-dev.rb"
           git -C "$tap" init -b develop
           git -C "$tap" config user.name packaging-ci
           git -C "$tap" config user.email packaging-ci@users.noreply.github.com
@@ -266,11 +278,14 @@ jobs:
           git -C "$tap" commit -m 'Test formula'
           brew install --HEAD --build-from-source ivanovanatoliy/folea/folea
           folea --build-info | grep -Fx "SOURCE_COMMIT=$GITHUB_SHA"
-          test -f "$HOME/Applications/Folea Dev.app"
-          file "$HOME/Applications/Folea Dev.app" | grep -F "MacOS Alias file"
           brew test ivanovanatoliy/folea/folea
           brew uninstall folea
-          rm "$HOME/Applications/Folea Dev.app"
+
+          brew install --cask ivanovanatoliy/folea/folea-dev
+          folea-dev --build-info | grep -Fx "SOURCE_COMMIT=$GITHUB_SHA"
+          test -d "/Applications/Folea Dev.app"
+          brew uninstall --cask folea-dev
+          test ! -e "/Applications/Folea Dev.app"
 
   aur:
     needs: [prepare, test]
@@ -316,6 +331,10 @@ jobs:
         with:
           name: scoop-manifest
           path: scoop-manifest
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: homebrew-cask
+          path: homebrew-cask
       - name: Install repository tools
         run: |
           sudo apt-get update
@@ -411,9 +430,10 @@ jobs:
 
           git clone --branch develop \
             "https://x-access-token:${TOKEN}@github.com/ivanovanatoliy/homebrew-folea.git" "$RUNNER_TEMP/homebrew-folea"
-          mkdir -p "$RUNNER_TEMP/homebrew-folea/Formula"
+          mkdir -p "$RUNNER_TEMP/homebrew-folea/Formula" "$RUNNER_TEMP/homebrew-folea/Casks"
           cp packaging/homebrew/Formula/folea.rb "$RUNNER_TEMP/homebrew-folea/Formula/folea.rb"
-          git -C "$RUNNER_TEMP/homebrew-folea" add Formula/folea.rb
+          cp homebrew-cask/folea-dev.rb "$RUNNER_TEMP/homebrew-folea/Casks/folea-dev.rb"
+          git -C "$RUNNER_TEMP/homebrew-folea" add Formula/folea.rb Casks/folea-dev.rb
           if ! git -C "$RUNNER_TEMP/homebrew-folea" diff --cached --quiet; then
             git -C "$RUNNER_TEMP/homebrew-folea" commit -m 'Update Folea formula'
             git -C "$RUNNER_TEMP/homebrew-folea" push origin develop
@@ -445,3 +465,6 @@ jobs:
           curl --fail --silent --show-error \
             https://raw.githubusercontent.com/ivanovanatoliy/homebrew-folea/develop/Formula/folea.rb \
             | grep -F 'branch: "develop"'
+          curl --fail --silent --show-error \
+            https://raw.githubusercontent.com/ivanovanatoliy/homebrew-folea/develop/Casks/folea-dev.rb \
+            | grep -F "$GITHUB_SHA"

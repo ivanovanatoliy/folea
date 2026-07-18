@@ -19,24 +19,30 @@ then runs `npm ci` and builds the unpacked application locally with Node.js 22. 
 contains the pinned `nodejs22` build dependency, so no extra bucket is needed. Scoop owns the
 `Folea Dev` shortcut, the `folea-dev` shim, updates, and removal.
 
-## macOS — Homebrew HEAD
+## macOS — Homebrew
+
+For a desktop installation that appears in Spotlight:
+
+```bash
+brew install --cask ivanovanatoliy/folea/folea-dev
+folea-dev --build-info
+```
+
+The cask downloads the immutable archive for one exact `develop` commit, verifies its SHA-256,
+builds locally with Node.js 22, and installs `Folea Dev.app` in `/Applications`. Homebrew owns the
+application, command shim, updates, and removal. Update normally with `brew update` and
+`brew upgrade --cask folea-dev`.
+
+The source-tracking HEAD formula remains available for command-line use:
 
 ```bash
 brew install --HEAD ivanovanatoliy/folea/folea
 folea --build-info
 ```
 
-Fetch and rebuild the latest `develop` commit with:
-
-```bash
-brew update
-brew reinstall --HEAD ivanovanatoliy/folea/folea
-```
-
-The HEAD formula clones `develop`, runs `npm ci`, builds an unpacked `.app`, applies a local ad-hoc
-signature, and creates `~/Applications/Folea Dev.app` as a macOS alias so Spotlight can find it. It
-does not use an Apple Developer certificate or notarization. After uninstalling, remove the tiny
-Spotlight alias with `rm ~/Applications/Folea\\ Dev.app`.
+Both installations use a local ad-hoc signature, not an Apple Developer certificate or
+notarization. The formula keeps its `.app` inside the Homebrew Cellar, so use the cask when Spotlight
+integration is required.
 
 ## Arch Linux / Manjaro / EndeavourOS — AUR
 
