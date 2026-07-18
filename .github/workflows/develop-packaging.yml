@@ -182,8 +182,8 @@ jobs:
                 apt-get update
                 apt-get install -y /fixture/*.deb
                 apt-get install -y /current/*.deb
-                test "$(dpkg-query -W -f="${Status}" folea-dev)" = "install ok installed"
-                /opt/folea/folea --build-info | grep -Fx "SOURCE_COMMIT=$EXPECTED_SHA"
+                test "$(dpkg-query -W -f="\${Status}" folea-dev)" = "install ok installed"
+                grep -Fx "SOURCE_COMMIT=$EXPECTED_SHA" /opt/folea/resources/build-info
                 apt-get purge -y folea-dev
                 ! dpkg-query -W folea-dev
               '
@@ -197,7 +197,7 @@ jobs:
                 dnf install -y /fixture/*.rpm
                 dnf upgrade -y /current/*.rpm
                 rpm -q folea-dev
-                /opt/folea/folea --build-info | grep -Fx "SOURCE_COMMIT=$EXPECTED_SHA"
+                grep -Fx "SOURCE_COMMIT=$EXPECTED_SHA" /opt/folea/resources/build-info
                 dnf remove -y folea-dev
                 ! rpm -q folea-dev
               '
@@ -217,12 +217,13 @@ jobs:
           Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
           Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
           scoop bucket add versions
-          git init test-bucket
+          git init -b develop test-bucket
           git -C test-bucket config user.name packaging-ci
           git -C test-bucket config user.email packaging-ci@users.noreply.github.com
           git -C test-bucket add .
           git -C test-bucket commit -m 'Test manifest'
-          scoop bucket add folea-test "$PWD\test-bucket"
+          $bucketUrl = "file:///$($PWD.Path.Replace('\', '/'))/test-bucket"
+          scoop bucket add folea-test $bucketUrl
           scoop install folea-test/folea-dev
       - name: Verify Scoop install
         shell: powershell
@@ -257,7 +258,7 @@ jobs:
           tap="$(brew --repository)/Library/Taps/ivanovanatoliy/homebrew-folea"
           mkdir -p "$tap/Formula"
           cp packaging/homebrew/Formula/folea.rb "$tap/Formula/folea.rb"
-          git -C "$tap" init
+          git -C "$tap" init -b develop
           git -C "$tap" config user.name packaging-ci
           git -C "$tap" config user.email packaging-ci@users.noreply.github.com
           git -C "$tap" add .
@@ -289,7 +290,7 @@ jobs:
               chown -R builder:builder /home/builder/aur
               su builder -c "cd /home/builder/aur && makepkg --syncdeps --cleanbuild --noconfirm"
               pacman -U --noconfirm /home/builder/aur/folea-git-*.pkg.tar.zst
-              /usr/bin/folea --build-info | grep -Fx "SOURCE_COMMIT=$EXPECTED_SHA"
+              su builder -c "/usr/bin/folea --build-info" | grep -Fx "SOURCE_COMMIT=$EXPECTED_SHA"
               pacman -Rns --noconfirm folea-git
             '
 
@@ -365,7 +366,7 @@ jobs:
             printf "Types: deb\nURIs: file:///repo/apt\nSuites: develop\nComponents: main\nArchitectures: amd64\nSigned-By: /etc/apt/keyrings/folea-packages.asc\n" > /etc/apt/sources.list.d/folea.sources
             apt-get update
             apt-get install -y folea-dev
-            /opt/folea/folea --build-info | grep -Fx "SOURCE_COMMIT=$EXPECTED_SHA"
+            grep -Fx "SOURCE_COMMIT=$EXPECTED_SHA" /opt/folea/resources/build-info
             apt-get purge -y folea-dev
           '
       - name: Test authenticated DNF repository
@@ -378,7 +379,7 @@ jobs:
               rpm --import /repo/repo-signing-key.asc
               printf "[folea]\nname=Folea\nbaseurl=file:///repo/rpm/fedora/$releasever/$basearch\nenabled=1\ngpgcheck=1\nrepo_gpgcheck=1\ngpgkey=file:///repo/repo-signing-key.asc\n" > /etc/yum.repos.d/folea.repo
               dnf install -y folea-dev
-              /opt/folea/folea --build-info | grep -Fx "SOURCE_COMMIT=$EXPECTED_SHA"
+              grep -Fx "SOURCE_COMMIT=$EXPECTED_SHA" /opt/folea/resources/build-info
               dnf remove -y folea-dev
             '
           done

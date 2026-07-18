@@ -20,16 +20,21 @@ class Folea < Formula
     app = Dir["dist/**/folea.app"].first
     odie "electron-builder did not produce folea.app" unless app
 
-    system "codesign", "--force", "--deep", "--sign", "-", app
-    prefix.install app => "Folea.app"
+    system "ditto", "-c", "-k", "--keepParent", app, prefix/"folea.app.zip"
     (bin/"folea").write <<~SH
       #!/bin/sh
-      exec "#{prefix}/Folea.app/Contents/MacOS/folea" "$@"
+      exec "#{prefix}/folea.app/Contents/MacOS/folea" "$@"
     SH
+  end
+
+  def post_install
+    system "ditto", "-x", "-k", prefix/"folea.app.zip", prefix
+    rm prefix/"folea.app.zip"
+    system "codesign", "--force", "--deep", "--sign", "-", prefix/"folea.app"
   end
 
   test do
     assert_match "SOURCE_COMMIT=", shell_output("#{bin}/folea --build-info")
-    assert_predicate prefix/"Folea.app", :directory?
+    assert_predicate prefix/"folea.app", :directory?
   end
 end
