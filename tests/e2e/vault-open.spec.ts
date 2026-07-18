@@ -21,7 +21,7 @@ test('shows start menu when no vault is configured', async () => {
     await expect(page.getByTestId('start-menu-vault-row')).toHaveCount(0);
     await expect(page.getByTestId('statusline-zoom')).toHaveCount(0);
     await expect(page.getByTestId('statusline-page')).toHaveCount(0);
-    await expect(page.getByTestId('statusline-mode')).toHaveText('[start screen]');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[start_screen]');
     expect(
       await page.getByTestId('statusline-mode').evaluate((element) => {
         const mode = element.getBoundingClientRect();
@@ -114,7 +114,7 @@ test('reopens vault from recent list after closing', async () => {
     await expect(page.getByTestId('start-menu')).toBeVisible({ timeout: 5_000 });
     await expect(page.getByTestId('statusline-zoom')).toHaveCount(0);
     await expect(page.getByTestId('statusline-page')).toHaveCount(0);
-    await expect(page.getByTestId('statusline-mode')).toHaveText('[start screen]');
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[start_screen]');
     await expect(page.getByTestId('start-menu-vault-row')).toHaveCount(1);
     await expect(page.getByTestId('start-menu-vault-row')).toContainText(path.basename(vaultRoot));
 
