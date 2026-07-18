@@ -19,6 +19,15 @@ test('shows start menu when no vault is configured', async () => {
       /\/assets\/logo-(?:dark|light)-.+\.svg$/
     );
     await expect(page.getByTestId('start-menu-vault-row')).toHaveCount(0);
+    await expect(page.getByTestId('statusline-zoom')).toHaveCount(0);
+    await expect(page.getByTestId('statusline-page')).toHaveCount(0);
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[start screen]');
+    expect(
+      await page.getByTestId('statusline-mode').evaluate((element) => {
+        const mode = element.getBoundingClientRect();
+        return element.parentElement!.getBoundingClientRect().right - mode.right;
+      })
+    ).toBe(10);
     await expect(page.getByTestId('start-menu-open-link')).toBeVisible();
     await page.keyboard.press('Tab');
     await expect(page.getByTestId('start-menu-open-link')).toBeFocused();
@@ -103,6 +112,9 @@ test('reopens vault from recent list after closing', async () => {
 
     // Start menu appears with the vault in the recent list
     await expect(page.getByTestId('start-menu')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByTestId('statusline-zoom')).toHaveCount(0);
+    await expect(page.getByTestId('statusline-page')).toHaveCount(0);
+    await expect(page.getByTestId('statusline-mode')).toHaveText('[start screen]');
     await expect(page.getByTestId('start-menu-vault-row')).toHaveCount(1);
     await expect(page.getByTestId('start-menu-vault-row')).toContainText(path.basename(vaultRoot));
 

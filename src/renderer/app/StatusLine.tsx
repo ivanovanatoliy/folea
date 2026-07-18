@@ -49,9 +49,11 @@ export const StatusLine = (props: StatusLineProps) => {
           {props.docName}
         </span>
       </Show>
-      <span class="statusline-zoom" data-testid="statusline-zoom">
-        [{formatZoom(zoom())}]
-      </span>
+      <Show when={props.vaultStatus !== 'no vault'}>
+        <span class="statusline-zoom" data-testid="statusline-zoom">
+          [{formatZoom(zoom())}]
+        </span>
+      </Show>
       <Show when={props.warmupMessage}>
         <span class="statusline-warmup" data-testid="statusline-warmup">
           {props.warmupMessage}
@@ -62,11 +64,13 @@ export const StatusLine = (props: StatusLineProps) => {
           {props.configWarning}
         </span>
       </Show>
-      <span class="statusline-page" data-testid="statusline-page">
-        {props.pageStatus}
-      </span>
+      <Show when={props.vaultStatus !== 'no vault'}>
+        <span class="statusline-page" data-testid="statusline-page">
+          {props.pageStatus}
+        </span>
+      </Show>
       <span class="statusline-mode" data-testid="statusline-mode">
-        [{props.mode}]
+        [{props.vaultStatus === 'no vault' ? 'start_screen' : props.mode}]
       </span>
     </footer>
   );
