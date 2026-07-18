@@ -34,8 +34,9 @@ brew reinstall --HEAD ivanovanatoliy/folea/folea
 ```
 
 The HEAD formula clones `develop`, runs `npm ci`, builds an unpacked `.app`, applies a local ad-hoc
-signature, and registers it with macOS Launch Services so Spotlight can find it. It does not use an
-Apple Developer certificate or notarization.
+signature, and creates `~/Applications/Folea Dev.app` as a macOS alias so Spotlight can find it. It
+does not use an Apple Developer certificate or notarization. After uninstalling, remove the tiny
+Spotlight alias with `rm ~/Applications/Folea\\ Dev.app`.
 
 ## Arch Linux / Manjaro / EndeavourOS — AUR
 

@@ -31,8 +31,22 @@ class Folea < Formula
     system "ditto", "-x", "-k", prefix/"folea.app.zip", prefix
     rm prefix/"folea.app.zip"
     system "codesign", "--force", "--deep", "--sign", "-", prefix/"folea.app"
-    system "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
-           "-f", prefix/"folea.app"
+
+    applications = Pathname(Dir.home)/"Applications"
+    applications.mkpath
+    app_alias = applications/"Folea Dev.app"
+    rm_f app_alias
+    system "osascript", "-l", "JavaScript", "-e", <<~JAVASCRIPT
+      ObjC.import("Foundation");
+      const target = $.NSURL.fileURLWithPath(#{(opt_prefix/"folea.app").to_s.dump});
+      const alias = $.NSURL.fileURLWithPath(#{app_alias.to_s.dump});
+      const data = target.bookmarkDataWithOptionsIncludingResourceValuesForKeysRelativeToURLError(
+        $.NSURLBookmarkCreationSuitableForBookmarkFile, null, null, null
+      );
+      if (!data || !$.NSURL.writeBookmarkDataToURLOptionsError(data, alias, 0, null)) {
+        throw new Error("Could not create Spotlight alias");
+      }
+    JAVASCRIPT
   end
 
   test do
