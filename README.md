@@ -25,6 +25,14 @@ user's external terminal/editor command, normally Neovim with tinymist.
 
 ## Install
 
+### Development packages
+
+> **These packages track Folea's `develop` branch and may contain unstable or incomplete changes.**
+
+Scoop, Homebrew HEAD, AUR, authenticated APT/DNF repositories, and AppImage instructions are in
+[Development packages](docs/development-packages.md). Every installed build exposes its exact source
+commit through `--build-info`.
+
 ### From source
 
 ```bash
@@ -47,8 +55,8 @@ npm run package
 ```
 
 Targets are Linux AppImage + deb, Windows NSIS, and macOS dmg. Packages are unsigned — on
-macOS use **Open Anyway** in System Settings → Privacy & Security (or
-`xattr -dr com.apple.quarantine`); on Windows SmartScreen may require **More info → Run anyway**.
+macOS use **Open Anyway** in System Settings → Privacy & Security; on Windows SmartScreen may require
+**More info → Run anyway**.
 
 ## Configuration
 

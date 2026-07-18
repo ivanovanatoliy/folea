@@ -12,8 +12,8 @@ Thanks for your interest in contributing. The rules below apply to any PR.
 - **TypeScript strict**; no unexplained `any` / `@ts-ignore`.
 - **Perf budget measured and met**: input-to-paint ≤ ~16 ms, warm note-open (cached) ≤ ~50 ms,
   cold start ~1 s. Include real numbers in the PR when perf-sensitive code changes.
-- **Local gate green** (hosted CI is intentionally disabled): typecheck, lint, tests, relevant E2E,
-  rebuild when native packaging behavior is touched, and packaging smoke checks for release work.
+- **Local gate green**: typecheck, lint, tests, relevant E2E, rebuild when native packaging behavior
+  is touched, and packaging smoke checks for distribution work.
 
 ## Workflow
 
@@ -33,21 +33,20 @@ npm run test:e2e   # Playwright-Electron
 npm run rebuild    # required when native-module packaging/rebuild behavior is touched
 ```
 
-Release/package work also runs:
+Distribution/package work also runs:
 
 ```bash
-npm run package       # current OS artifacts
-npm run package:dir   # current OS unpacked app
-npm run package:linux:appimage  # Linux AppImage-only smoke build when deb tooling is unavailable
-npm run package:all   # cross-targets where supported by the host
-npm run install:unpacked # current OS user-local app-menu install from source
-npm run uninstall:unpacked
-npm run install:appimage # Linux AppImage user-local app-menu install from source
-npm run uninstall:appimage
+npm run package                   # current OS artifacts
+npm run package:dir               # current OS unpacked app
+npm run package:linux:appimage    # Linux AppImage-only build
+npm run package:linux:repo        # Linux AppImage + DEB + RPM
+npm run app:install               # current OS user-local install from source
+npm run app:uninstall
 ```
 
-Record which OS artifacts were built and smoke-tested in the PR. Unsigned macOS/Windows artifacts
-are expected for now; signing/notarization and auto-update are out of scope unless discussed first.
+Record which OS artifacts were built and smoke-tested in the PR. Development distribution is
+triggered only from `develop`; it does not use `main`, tags, or GitHub Releases. See
+[`docs/development-packages.md`](docs/development-packages.md).
 
 ## Tests
 

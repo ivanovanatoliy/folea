@@ -1,0 +1,34 @@
+{
+  "version": "__VERSION__",
+  "description": "Development build of Folea from commit __SHORT_SHA__",
+  "homepage": "https://github.com/ivanovanatoliy/folea",
+  "license": "Apache-2.0",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/ivanovanatoliy/folea/archive/__FULL_SHA__.zip",
+      "hash": "__ARCHIVE_SHA256__",
+      "extract_dir": "folea-__FULL_SHA__"
+    }
+  },
+  "depends": "versions/nodejs22",
+  "installer": {
+    "script": [
+      "$env:CSC_IDENTITY_AUTO_DISCOVERY = 'false'",
+      "$env:FOLEA_COMMIT_SHA = '__FULL_SHA__'",
+      "$env:FOLEA_COMMIT_COUNT = '__COMMIT_COUNT__'",
+      "$env:FOLEA_BUILD_TIMESTAMP = '__TIMESTAMP__'",
+      "$env:FOLEA_SOURCE_BRANCH = 'develop'",
+      "$env:FOLEA_WORKFLOW_RUN_URL = '__WORKFLOW_RUN_URL__'",
+      "$builtVersion = node scripts/prepare-development-build.mjs",
+      "if ($builtVersion -ne '__VERSION__') { throw \"Unexpected build version: $builtVersion\" }",
+      "npm ci",
+      "npm version $builtVersion --no-git-tag-version --allow-same-version",
+      "npm run build",
+      "npx electron-builder --dir --win --x64 --publish never",
+      "Move-Item -LiteralPath (Join-Path $dir 'dist\\win-unpacked') -Destination (Join-Path $dir 'app')",
+      "Get-ChildItem -LiteralPath $dir -Force | Where-Object Name -ne 'app' | Remove-Item -Recurse -Force"
+    ]
+  },
+  "bin": [["app\\folea.exe", "folea-dev"]],
+  "shortcuts": [["app\\folea.exe", "Folea Dev"]]
+}

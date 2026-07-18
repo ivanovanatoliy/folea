@@ -2,6 +2,8 @@
   "name": "folea",
   "version": "0.0.0",
   "description": "Keyboard-driven minimalist note manager for Typst notes.",
+  "homepage": "https://github.com/ivanovanatoliy/folea",
+  "repository": "https://github.com/ivanovanatoliy/folea.git",
   "main": "out/main/index.js",
   "private": true,
   "license": "Apache-2.0",
@@ -25,6 +27,12 @@
       "LICENSE",
       "NOTICE"
     ],
+    "extraResources": [
+      {
+        "from": "packaging/build-info",
+        "to": "build-info"
+      }
+    ],
     "asarUnpack": [
       "node_modules/@vscode/ripgrep-*/bin/**"
     ],
@@ -46,10 +54,19 @@
         "AppImage",
         "deb"
       ],
+      "artifactName": "folea-dev-${version}-linux-${arch}.${ext}",
       "icon": "assets/logo/app-icon-dark.svg",
       "category": "Utility",
       "maintainer": "folea contributors <maintainers@folea.dev>",
       "syncDesktopName": true
+    },
+    "deb": {
+      "packageName": "folea-dev",
+      "artifactName": "folea-dev_${version}_${arch}.${ext}"
+    },
+    "rpm": {
+      "packageName": "folea-dev",
+      "artifactName": "folea-dev-${version}.${arch}.${ext}"
     }
   },
   "scripts": {
@@ -58,6 +75,7 @@
     "package": "npm run build && electron-builder --publish never",
     "package:dir": "npm run build && electron-builder --dir --publish never",
     "package:linux:appimage": "npm run build && electron-builder --linux AppImage --publish never",
+    "package:linux:repo": "npm run build && electron-builder --linux AppImage deb rpm --x64 --publish never",
     "package:all": "npm run build && electron-builder --linux AppImage deb --win nsis --mac dmg --publish never",
     "app:install": "npm run package:dir && node scripts/install-unpacked.mjs",
     "app:uninstall": "node scripts/uninstall-unpacked.mjs",

@@ -1,0 +1,6 @@
+Types: deb
+URIs: https://ivanovanatoliy.github.io/folea-packages/apt
+Suites: develop
+Components: main
+Architectures: amd64
+Signed-By: /etc/apt/keyrings/folea-packages.asc

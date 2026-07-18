@@ -1,0 +1,440 @@
+name: Develop packaging
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+concurrency:
+  group: develop-packaging
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
+      timestamp: ${{ steps.metadata.outputs.timestamp }}
+      commit_count: ${{ steps.metadata.outputs.commit_count }}
+      short_sha: ${{ steps.metadata.outputs.short_sha }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - id: metadata
+        name: Create development version
+        shell: bash
+        run: |
+          [[ "$GITHUB_REF" == refs/heads/develop ]]
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          timestamp="$(date -u +%Y%m%d%H%M%S)"
+          count="$(git rev-list --count HEAD)"
+          short="$(git rev-parse --short=7 HEAD)"
+          export FOLEA_COMMIT_SHA="$GITHUB_SHA"
+          export FOLEA_BUILD_TIMESTAMP="$timestamp"
+          export FOLEA_COMMIT_COUNT="$count"
+          export FOLEA_SOURCE_BRANCH=develop
+          export FOLEA_WORKFLOW_RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          version="$(node scripts/prepare-development-build.mjs)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "timestamp=$timestamp" >> "$GITHUB_OUTPUT"
+          echo "commit_count=$count" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$short" >> "$GITHUB_OUTPUT"
+      - name: Render immutable Scoop manifest
+        shell: bash
+        env:
+          FOLEA_VERSION: ${{ steps.metadata.outputs.version }}
+          FOLEA_COMMIT_SHA: ${{ github.sha }}
+          FOLEA_COMMIT_COUNT: ${{ steps.metadata.outputs.commit_count }}
+          FOLEA_BUILD_TIMESTAMP: ${{ steps.metadata.outputs.timestamp }}
+          FOLEA_WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          curl --fail --location --retry 3 \
+            "https://github.com/$GITHUB_REPOSITORY/archive/$GITHUB_SHA.zip" \
+            --output source.zip
+          export FOLEA_ARCHIVE_SHA256="$(sha256sum source.zip | cut -d' ' -f1)"
+          mkdir scoop-manifest
+          node scripts/render-scoop-manifest.mjs scoop-manifest/folea-dev.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: scoop-manifest
+          path: scoop-manifest/folea-dev.json
+          if-no-files-found: error
+          retention-days: 7
+
+  test:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run test
+      - run: npm run build
+      - run: xvfb-run -a npm run test:e2e:run
+
+  linux-packages:
+    needs: [prepare, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: sudo apt-get update && sudo apt-get install -y rpm
+      - run: npm ci
+      - name: Build AppImage, DEB and RPM
+        shell: bash
+        env:
+          BUILD_NUMBER: '1'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          FOLEA_COMMIT_SHA: ${{ github.sha }}
+          FOLEA_COMMIT_COUNT: ${{ needs.prepare.outputs.commit_count }}
+          FOLEA_BUILD_TIMESTAMP: ${{ needs.prepare.outputs.timestamp }}
+          FOLEA_SOURCE_BRANCH: develop
+          FOLEA_WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          version="$(node scripts/prepare-development-build.mjs)"
+          [[ "$version" == "${{ needs.prepare.outputs.version }}" ]]
+          npm version "$version" --no-git-tag-version --allow-same-version
+          npm run build
+          npx electron-builder --linux AppImage deb rpm --x64 --publish never
+          mkdir -p artifacts/current artifacts/upgrade-fixture
+          cp dist/*.AppImage dist/*.deb dist/*.rpm packaging/build-info artifacts/current/
+
+          npm version "0.0.0-git.20000101000000.c00000000.${{ needs.prepare.outputs.short_sha }}" \
+            --no-git-tag-version --allow-same-version
+          rm -f dist/*.deb dist/*.rpm
+          npx electron-builder --linux deb rpm --x64 --prepackaged dist/linux-unpacked --publish never
+          cp dist/*.deb dist/*.rpm artifacts/upgrade-fixture/
+      - name: Validate package metadata
+        shell: bash
+        run: |
+          deb="$(find artifacts/current -maxdepth 1 -name '*.deb' -print -quit)"
+          rpm="$(find artifacts/current -maxdepth 1 -name '*.rpm' -print -quit)"
+          [[ "$(dpkg-deb -f "$deb" Package)" == folea-dev ]]
+          [[ "$(dpkg-deb -f "$deb" Version)" == 0.0.0~git.* ]]
+          [[ "$(rpm -qp --queryformat '%{NAME}' "$rpm")" == folea-dev ]]
+          [[ "$(rpm -qp --queryformat '%{VERSION}' "$rpm")" == 0.0.0~git.* ]]
+          [[ "$(find artifacts/current -maxdepth 1 -name '*.AppImage' | wc -l)" == 1 ]]
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-packages
+          path: artifacts/current/
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-upgrade-fixtures
+          path: artifacts/upgrade-fixture/
+          if-no-files-found: error
+          retention-days: 1
+
+  linux-package-tests:
+    needs: [prepare, linux-packages]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: linux-packages
+          path: current
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: linux-upgrade-fixtures
+          path: fixture
+      - name: Test AppImage contents
+        shell: bash
+        run: |
+          chmod +x current/*.AppImage
+          current/*.AppImage --appimage-extract >/dev/null
+          grep -Fx "SOURCE_COMMIT=$GITHUB_SHA" squashfs-root/resources/build-info
+          test -x squashfs-root/AppRun
+          test -f squashfs-root/folea.desktop
+      - name: Test DEB install, upgrade and removal
+        shell: bash
+        run: |
+          for image in debian:13 ubuntu:24.04; do
+            docker run --rm -e EXPECTED_SHA="$GITHUB_SHA" \
+              -v "$PWD/current:/current:ro" -v "$PWD/fixture:/fixture:ro" "$image" sh -euxc '
+                apt-get update
+                apt-get install -y /fixture/*.deb
+                apt-get install -y /current/*.deb
+                test "$(dpkg-query -W -f="${Status}" folea-dev)" = "install ok installed"
+                /opt/folea/folea --build-info | grep -Fx "SOURCE_COMMIT=$EXPECTED_SHA"
+                apt-get purge -y folea-dev
+                ! dpkg-query -W folea-dev
+              '
+          done
+      - name: Test RPM install, upgrade and removal
+        shell: bash
+        run: |
+          for image in fedora:43 fedora:44; do
+            docker run --rm -e EXPECTED_SHA="$GITHUB_SHA" \
+              -v "$PWD/current:/current:ro" -v "$PWD/fixture:/fixture:ro" "$image" sh -euxc '
+                dnf install -y /fixture/*.rpm
+                dnf upgrade -y /current/*.rpm
+                rpm -q folea-dev
+                /opt/folea/folea --build-info | grep -Fx "SOURCE_COMMIT=$EXPECTED_SHA"
+                dnf remove -y folea-dev
+                ! rpm -q folea-dev
+              '
+          done
+
+  scoop:
+    needs: [prepare, test]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: scoop-manifest
+          path: test-bucket/bucket
+      - name: Install Scoop and Folea from source
+        shell: powershell
+        run: |
+          Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+          Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+          scoop bucket add versions
+          git init test-bucket
+          git -C test-bucket config user.name packaging-ci
+          git -C test-bucket config user.email packaging-ci@users.noreply.github.com
+          git -C test-bucket add .
+          git -C test-bucket commit -m 'Test manifest'
+          scoop bucket add folea-test "$PWD\test-bucket"
+          scoop install folea-test/folea-dev
+      - name: Verify Scoop install
+        shell: powershell
+        run: |
+          $prefix = scoop prefix folea-dev
+          if (!(Test-Path "$prefix\app\folea.exe")) { throw 'Executable is missing' }
+          if (!(Get-Command folea-dev -ErrorAction SilentlyContinue)) { throw 'Shim is missing' }
+          if (!(Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu" -Recurse -Filter 'Folea Dev.lnk')) { throw 'Shortcut is missing' }
+          if (!(Get-Content "$prefix\app\resources\build-info" | Select-String -SimpleMatch "SOURCE_COMMIT=$env:GITHUB_SHA")) { throw 'Commit metadata is wrong' }
+          $process = Start-Process "$prefix\app\folea.exe" -PassThru
+          Start-Sleep -Seconds 5
+          if ($process.HasExited) { throw 'Folea exited during launch smoke test' }
+          Stop-Process -Id $process.Id -Force
+          scoop uninstall folea-dev
+          if (Test-Path $prefix) { throw 'Scoop left the install directory behind' }
+
+  homebrew:
+    needs: [prepare, test]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15-intel, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install HEAD formula
+        shell: bash
+        run: |
+          tap="$(brew --repository)/Library/Taps/ivanovanatoliy/homebrew-folea"
+          mkdir -p "$tap/Formula"
+          cp packaging/homebrew/Formula/folea.rb "$tap/Formula/folea.rb"
+          git -C "$tap" init
+          git -C "$tap" config user.name packaging-ci
+          git -C "$tap" config user.email packaging-ci@users.noreply.github.com
+          git -C "$tap" add .
+          git -C "$tap" commit -m 'Test formula'
+          brew install --HEAD --build-from-source ivanovanatoliy/folea/folea
+          folea --build-info | grep -Fx "SOURCE_COMMIT=$GITHUB_SHA"
+          brew test ivanovanatoliy/folea/folea
+          brew uninstall folea
+
+  aur:
+    needs: [prepare, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Build and install folea-git with makepkg
+        shell: bash
+        run: |
+          docker run --rm -e EXPECTED_SHA="$GITHUB_SHA" -v "$PWD:/source:ro" \
+            archlinux:base-devel bash -euxo pipefail -c '
+              pacman -Syu --noconfirm git nodejs-lts-jod npm sudo
+              useradd -m builder
+              echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder
+              cp -r /source/packaging/aur /home/builder/aur
+              sed -i "s|folea::git+https://github.com/ivanovanatoliy/folea.git#branch=develop|folea::git+file:///source#commit=$EXPECTED_SHA|" /home/builder/aur/PKGBUILD
+              chown -R builder:builder /home/builder/aur
+              su builder -c "cd /home/builder/aur && makepkg --syncdeps --cleanbuild --noconfirm"
+              pacman -U --noconfirm /home/builder/aur/folea-git-*.pkg.tar.zst
+              /usr/bin/folea --build-info | grep -Fx "SOURCE_COMMIT=$EXPECTED_SHA"
+              pacman -Rns --noconfirm folea-git
+            '
+
+  publish:
+    needs: [prepare, linux-package-tests, scoop, homebrew, aur]
+    runs-on: ubuntu-latest
+    environment: packaging
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: linux-packages
+          path: artifacts
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: scoop-manifest
+          path: scoop-manifest
+      - name: Install repository tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apt-utils createrepo-c dpkg-dev rpm
+      - name: Import package repository key
+        id: gpg
+        shell: bash
+        env:
+          PRIVATE_KEY: ${{ secrets.PACKAGE_REPO_GPG_PRIVATE_KEY }}
+          PASSPHRASE: ${{ secrets.PACKAGE_REPO_GPG_PASSPHRASE }}
+        run: |
+          [[ -n "$PRIVATE_KEY" && -n "$PASSPHRASE" ]]
+          export GNUPGHOME="$RUNNER_TEMP/gnupg"
+          mkdir -m 700 "$GNUPGHOME"
+          printf '%s' "$PRIVATE_KEY" | gpg --batch --import
+          key_id="$(gpg --batch --with-colons --list-secret-keys | awk -F: '$1 == "sec" { print $5; exit }')"
+          [[ -n "$key_id" ]]
+          printf unlock > "$RUNNER_TEMP/unlock"
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$PASSPHRASE" \
+            --local-user "$key_id" --detach-sign "$RUNNER_TEMP/unlock"
+          echo "key-id=$key_id" >> "$GITHUB_OUTPUT"
+          echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
+      - name: Assemble and verify signed repositories
+        shell: bash
+        env:
+          TOKEN: ${{ secrets.PACKAGING_REPOS_TOKEN }}
+          PACKAGE_ROOT: ${{ runner.temp }}/folea-packages
+          ARTIFACT_DIR: ${{ github.workspace }}/artifacts
+          FOLEA_COMMIT_SHA: ${{ github.sha }}
+          FOLEA_SHORT_SHA: ${{ needs.prepare.outputs.short_sha }}
+          GPG_KEY_ID: ${{ steps.gpg.outputs.key-id }}
+        run: |
+          [[ -n "$TOKEN" ]]
+          git clone --branch develop \
+            "https://x-access-token:${TOKEN}@github.com/ivanovanatoliy/folea-packages.git" "$PACKAGE_ROOT"
+          bash packaging/scripts/assemble-repositories.sh
+          gpg --verify "$PACKAGE_ROOT/SHA256SUMS.asc" "$PACKAGE_ROOT/SHA256SUMS"
+          gpg --verify "$PACKAGE_ROOT/apt/dists/develop/InRelease"
+          sudo rpm --import "$PACKAGE_ROOT/repo-signing-key.asc"
+          rpmkeys --checksig "$ARTIFACT_DIR"/*.rpm
+          for fedora in 43 44; do
+            gpg --verify "$PACKAGE_ROOT/rpm/fedora/$fedora/x86_64/repodata/repomd.xml.asc" \
+              "$PACKAGE_ROOT/rpm/fedora/$fedora/x86_64/repodata/repomd.xml"
+          done
+      - name: Test authenticated APT repository
+        shell: bash
+        env:
+          PACKAGE_ROOT: ${{ runner.temp }}/folea-packages
+        run: |
+          docker run --rm -e EXPECTED_SHA="$GITHUB_SHA" -v "$PACKAGE_ROOT:/repo:ro" ubuntu:24.04 sh -euxc '
+            mkdir -p /etc/apt/keyrings
+            cp /repo/repo-signing-key.asc /etc/apt/keyrings/folea-packages.asc
+            printf "Types: deb\nURIs: file:///repo/apt\nSuites: develop\nComponents: main\nArchitectures: amd64\nSigned-By: /etc/apt/keyrings/folea-packages.asc\n" > /etc/apt/sources.list.d/folea.sources
+            apt-get update
+            apt-get install -y folea-dev
+            /opt/folea/folea --build-info | grep -Fx "SOURCE_COMMIT=$EXPECTED_SHA"
+            apt-get purge -y folea-dev
+          '
+      - name: Test authenticated DNF repository
+        shell: bash
+        env:
+          PACKAGE_ROOT: ${{ runner.temp }}/folea-packages
+        run: |
+          for fedora in 43 44; do
+            docker run --rm -e EXPECTED_SHA="$GITHUB_SHA" -v "$PACKAGE_ROOT:/repo:ro" "fedora:$fedora" sh -euxc '
+              rpm --import /repo/repo-signing-key.asc
+              printf "[folea]\nname=Folea\nbaseurl=file:///repo/rpm/fedora/$releasever/$basearch\nenabled=1\ngpgcheck=1\nrepo_gpgcheck=1\ngpgkey=file:///repo/repo-signing-key.asc\n" > /etc/yum.repos.d/folea.repo
+              dnf install -y folea-dev
+              /opt/folea/folea --build-info | grep -Fx "SOURCE_COMMIT=$EXPECTED_SHA"
+              dnf remove -y folea-dev
+            '
+          done
+      - name: Publish package repositories
+        shell: bash
+        env:
+          TOKEN: ${{ secrets.PACKAGING_REPOS_TOKEN }}
+          PACKAGE_ROOT: ${{ runner.temp }}/folea-packages
+        run: |
+          git config --global user.name folea-packaging[bot]
+          git config --global user.email 247982223+folea-packaging[bot]@users.noreply.github.com
+          git -C "$PACKAGE_ROOT" add .
+          git -C "$PACKAGE_ROOT" commit -m "Publish Folea $GITHUB_SHA"
+          git -C "$PACKAGE_ROOT" push origin develop
+
+          git clone --branch develop \
+            "https://x-access-token:${TOKEN}@github.com/ivanovanatoliy/scoop-folea.git" "$RUNNER_TEMP/scoop-folea"
+          mkdir -p "$RUNNER_TEMP/scoop-folea/bucket"
+          cp scoop-manifest/folea-dev.json "$RUNNER_TEMP/scoop-folea/bucket/folea-dev.json"
+          git -C "$RUNNER_TEMP/scoop-folea" add bucket/folea-dev.json
+          git -C "$RUNNER_TEMP/scoop-folea" commit -m "Update Folea to $GITHUB_SHA"
+          git -C "$RUNNER_TEMP/scoop-folea" push origin develop
+
+          git clone --branch develop \
+            "https://x-access-token:${TOKEN}@github.com/ivanovanatoliy/homebrew-folea.git" "$RUNNER_TEMP/homebrew-folea"
+          mkdir -p "$RUNNER_TEMP/homebrew-folea/Formula"
+          cp packaging/homebrew/Formula/folea.rb "$RUNNER_TEMP/homebrew-folea/Formula/folea.rb"
+          git -C "$RUNNER_TEMP/homebrew-folea" add Formula/folea.rb
+          if ! git -C "$RUNNER_TEMP/homebrew-folea" diff --cached --quiet; then
+            git -C "$RUNNER_TEMP/homebrew-folea" commit -m 'Update Folea formula'
+            git -C "$RUNNER_TEMP/homebrew-folea" push origin develop
+          fi
+
+  verify-publication:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify stable public URLs
+        shell: bash
+        run: |
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error \
+              https://ivanovanatoliy.github.io/folea-packages/appimage/folea-dev-linux-x64.AppImage.build-info \
+              | grep -Fx "SOURCE_COMMIT=$GITHUB_SHA"; then
+              break
+            fi
+            if [[ "$attempt" == 30 ]]; then exit 1; fi
+            sleep 10
+          done
+          curl --fail --silent --show-error --head \
+            https://ivanovanatoliy.github.io/folea-packages/apt/dists/develop/InRelease
+          curl --fail --silent --show-error --head \
+            https://ivanovanatoliy.github.io/folea-packages/rpm/fedora/44/x86_64/repodata/repomd.xml
+          curl --fail --silent --show-error \
+            https://raw.githubusercontent.com/ivanovanatoliy/scoop-folea/develop/bucket/folea-dev.json \
+            | grep -F "$GITHUB_SHA"
+          curl --fail --silent --show-error \
+            https://raw.githubusercontent.com/ivanovanatoliy/homebrew-folea/develop/Formula/folea.rb \
+            | grep -F 'branch: "develop"'
