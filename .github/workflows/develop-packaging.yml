@@ -225,6 +225,7 @@ jobs:
           $bucketUrl = "file:///$($PWD.Path.Replace('\', '/'))/test-bucket"
           scoop bucket add folea-test $bucketUrl
           scoop install folea-test/folea-dev
+          "$env:USERPROFILE\scoop\shims" | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: Verify Scoop install
         shell: powershell
         run: |
@@ -290,7 +291,8 @@ jobs:
               chown -R builder:builder /home/builder/aur
               su builder -c "cd /home/builder/aur && makepkg --syncdeps --cleanbuild --noconfirm"
               pacman -U --noconfirm /home/builder/aur/folea-git-*.pkg.tar.zst
-              su builder -c "/usr/bin/folea --build-info" | grep -Fx "SOURCE_COMMIT=$EXPECTED_SHA"
+              test -x /usr/bin/folea
+              grep -Fx "SOURCE_COMMIT=$EXPECTED_SHA" /opt/folea/resources/build-info
               pacman -Rns --noconfirm folea-git
             '
 
