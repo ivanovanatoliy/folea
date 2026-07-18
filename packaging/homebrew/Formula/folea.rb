@@ -31,6 +31,8 @@ class Folea < Formula
     system "ditto", "-x", "-k", prefix/"folea.app.zip", prefix
     rm prefix/"folea.app.zip"
     system "codesign", "--force", "--deep", "--sign", "-", prefix/"folea.app"
+    system "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
+           "-f", prefix/"folea.app"
   end
 
   test do

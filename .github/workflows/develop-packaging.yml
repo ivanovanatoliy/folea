@@ -266,6 +266,8 @@ jobs:
           git -C "$tap" commit -m 'Test formula'
           brew install --HEAD --build-from-source ivanovanatoliy/folea/folea
           folea --build-info | grep -Fx "SOURCE_COMMIT=$GITHUB_SHA"
+          lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+          "$lsregister" -dump | grep -F "$(brew --prefix folea)/folea.app"
           brew test ivanovanatoliy/folea/folea
           brew uninstall folea
 

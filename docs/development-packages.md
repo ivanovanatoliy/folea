@@ -33,8 +33,9 @@ brew update
 brew reinstall --HEAD ivanovanatoliy/folea/folea
 ```
 
-The HEAD formula clones `develop`, runs `npm ci`, builds an unpacked `.app`, and applies a local
-ad-hoc signature. It does not use an Apple Developer certificate or notarization.
+The HEAD formula clones `develop`, runs `npm ci`, builds an unpacked `.app`, applies a local ad-hoc
+signature, and registers it with macOS Launch Services so Spotlight can find it. It does not use an
+Apple Developer certificate or notarization.
 
 ## Arch Linux / Manjaro / EndeavourOS — AUR
 
