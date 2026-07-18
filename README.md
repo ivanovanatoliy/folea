@@ -1,8 +1,8 @@
 <p align="center">
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/brand/folea-logo-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="assets/brand/folea-logo-light.svg">
-  <img alt="folea" src="assets/brand/folea-logo-light.svg" width="320">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/logo/logo-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/logo/logo-light.svg">
+  <img alt="folea" src="assets/logo/logo-light.svg" width="320">
 </picture>
 </p>
 

@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import {
   buildEditorArgs,
   EditorLauncher,
+  getEditorSpawnEnvironment,
   nvimSockPath,
   parseEditorCommand
 } from '../../src/main/editor-launcher';
@@ -17,6 +18,26 @@ vi.mock('node:child_process', async (importOriginal) => {
 });
 
 const SOCK = '/tmp/folea-nvim-test.sock';
+
+describe('getEditorSpawnEnvironment', () => {
+  it('uses the login-shell PATH on macOS', () => {
+    const environment = { PATH: '/usr/bin', SHELL: '/bin/zsh' };
+    const readPath = vi.fn(() => '/custom/bin:/usr/bin');
+
+    const result = getEditorSpawnEnvironment('darwin', environment, readPath);
+
+    expect(readPath).toHaveBeenCalledWith('/bin/zsh', environment);
+    expect(result.PATH).toBe('/custom/bin:/usr/bin');
+  });
+
+  it('does not inspect a login shell outside macOS', () => {
+    const environment = { PATH: '/custom/bin' };
+    const readPath = vi.fn();
+
+    expect(getEditorSpawnEnvironment('linux', environment, readPath)).toBe(environment);
+    expect(readPath).not.toHaveBeenCalled();
+  });
+});
 
 describe('nvimSockPath', () => {
   it('returns a string', () => {
@@ -142,19 +163,20 @@ describe('EditorLauncher.open path validation', () => {
   });
 
   it('accepts a simple relative path without throwing', () => {
-    const launcher = new EditorLauncher();
+    const launcher = new EditorLauncher({ PATH: process.env.PATH });
     expect(() => launcher.open('/tmp', 'note.typ')).not.toThrow();
     launcher.dispose();
   });
 
   it('launches with shell disabled and preserves a metacharacter path as one argument', () => {
-    const launcher = new EditorLauncher();
+    const spawnEnvironment = { PATH: '/resolved/login/path' };
+    const launcher = new EditorLauncher(spawnEnvironment);
     launcher.open('/tmp', 'note;touch owned.typ', 'editor %FILE%');
 
     expect(vi.mocked(spawn)).toHaveBeenLastCalledWith(
       'editor',
       ['/tmp/note;touch owned.typ'],
-      expect.objectContaining({ shell: false })
+      expect.objectContaining({ env: spawnEnvironment, shell: false })
     );
   });
 });

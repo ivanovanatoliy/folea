@@ -20,7 +20,7 @@
     "copyright": "Copyright © 2026 folea contributors",
     "files": [
       "out/**",
-      "assets/brand/folea-icon.svg",
+      "assets/logo/app-icon-dark.svg",
       "package.json",
       "LICENSE",
       "NOTICE"
@@ -33,20 +33,20 @@
       "target": [
         "dmg"
       ],
-      "icon": "assets/brand/folea-icon.svg"
+      "icon": "assets/logo/app-icon-dark.svg"
     },
     "win": {
       "target": [
         "nsis"
       ],
-      "icon": "assets/brand/folea-icon.svg"
+      "icon": "assets/logo/app-icon-dark.svg"
     },
     "linux": {
       "target": [
         "AppImage",
         "deb"
       ],
-      "icon": "assets/brand/folea-icon.svg",
+      "icon": "assets/logo/app-icon-dark.svg",
       "category": "Utility",
       "maintainer": "folea contributors <maintainers@folea.dev>",
       "syncDesktopName": true
@@ -97,7 +97,8 @@
     "@typescript-eslint/eslint-plugin": "^8.61.1",
     "@typescript-eslint/parser": "^8.61.1",
     "@typescript/native": "npm:typescript@^7.0.2",
-    "electron": "^42.4.1",
+    "@vitest/coverage-v8": "^4.1.9",
+    "electron": "41.10.2",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "eslint": "^10.5.0",
@@ -108,7 +109,6 @@
     "typescript": "^6.0.3",
     "vite": "^7.3.6",
     "vite-plugin-solid": "^2.11.12",
-    "vitest": "^4.1.9",
-    "@vitest/coverage-v8": "^4.1.9"
+    "vitest": "^4.1.9"
   }
 }

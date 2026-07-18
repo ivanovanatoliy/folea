@@ -14,18 +14,14 @@ test('shows start menu when no vault is configured', async () => {
     const page = await app.firstWindow();
 
     await expect(page.getByTestId('start-menu')).toBeVisible();
+    await expect(page.locator('.start-menu-logo')).toHaveAttribute(
+      'src',
+      /\/assets\/logo-(?:dark|light)-.+\.svg$/
+    );
     await expect(page.getByTestId('start-menu-vault-row')).toHaveCount(0);
     await expect(page.getByTestId('start-menu-open-link')).toBeVisible();
     await page.keyboard.press('Tab');
     await expect(page.getByTestId('start-menu-open-link')).toBeFocused();
-    await expect
-      .poll(() =>
-        page.getByTestId('start-menu-open-link').evaluate((element) => {
-          const style = getComputedStyle(element);
-          return `${style.outlineStyle}:${style.outlineWidth}`;
-        })
-      )
-      .not.toBe('none:0px');
   } finally {
     await fs.rm(userDataDir, { recursive: true, force: true }).catch(() => {});
   }

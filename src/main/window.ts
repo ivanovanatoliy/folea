@@ -100,7 +100,7 @@ export const isTypstCompileWorkerUrl = (url: string): boolean => {
 };
 
 export const createMainWindow = (): BrowserWindow => {
-  const iconPath = join(app.getAppPath(), 'build/icon.png');
+  const iconPath = join(app.getAppPath(), 'assets/logo/app-icon-dark.svg');
   const icon = existsSync(iconPath) ? iconPath : undefined;
   const mainWindow = new BrowserWindow({
     width: 1100,

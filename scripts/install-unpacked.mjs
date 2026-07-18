@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process';
 const root = process.cwd();
 const home = os.homedir();
 const dist = path.join(root, 'dist');
-const icon = path.join(root, 'assets', 'brand', 'folea-icon.svg');
+const icon = path.join(root, 'assets', 'logo', 'app-icon-dark.svg');
 
 const assertReadable = async (filePath, label) => {
   try {

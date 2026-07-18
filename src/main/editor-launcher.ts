@@ -4,6 +4,34 @@ import { existsSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { normalize, join, sep } from 'node:path';
 
+const LOGIN_PATH_MARKER = '__FOLEA_LOGIN_PATH__';
+
+type LoginPathReader = (shell: string, environment: NodeJS.ProcessEnv) => string | undefined;
+
+const readLoginPath: LoginPathReader = (shell, environment) => {
+  const result = spawnSync(shell, ['-ilc', `printf '\\n${LOGIN_PATH_MARKER}%s\\n' "$PATH"`], {
+    encoding: 'utf8',
+    env: environment,
+    timeout: 3_000
+  });
+  const output = typeof result.stdout === 'string' ? result.stdout : '';
+  const markerIndex = output.lastIndexOf(LOGIN_PATH_MARKER);
+  return markerIndex < 0
+    ? undefined
+    : output.slice(markerIndex + LOGIN_PATH_MARKER.length).split(/\r?\n/, 1)[0];
+};
+
+export function getEditorSpawnEnvironment(
+  platform = process.platform,
+  environment: NodeJS.ProcessEnv = process.env,
+  readPath: LoginPathReader = readLoginPath
+): NodeJS.ProcessEnv {
+  if (platform !== 'darwin') return environment;
+
+  const loginPath = readPath(environment.SHELL || '/bin/zsh', environment);
+  return loginPath ? { ...environment, PATH: loginPath } : environment;
+}
+
 // Stable socket path scoped to a vault root so multiple folea instances
 // with different vaults each have their own nvim server.
 export function nvimSockPath(vaultRoot: string): string {
@@ -15,6 +43,12 @@ export function nvimSockPath(vaultRoot: string): string {
 }
 
 export class EditorLauncher {
+  private readonly spawnEnvironment: NodeJS.ProcessEnv;
+
+  constructor(spawnEnvironment = getEditorSpawnEnvironment()) {
+    this.spawnEnvironment = spawnEnvironment;
+  }
+
   open(vaultRoot: string, relPath: string, configuredCommand = ''): void {
     const absPath = this.validatePath(vaultRoot, relPath);
     const sockPath = nvimSockPath(vaultRoot);
@@ -43,6 +77,7 @@ export class EditorLauncher {
     if (!existsSync(sockPath)) return false;
 
     const result = spawnSync('nvim', ['--server', sockPath, '--remote', absPath], {
+      env: this.spawnEnvironment,
       stdio: 'ignore',
       timeout: 1000
     });
@@ -64,6 +99,7 @@ export class EditorLauncher {
     const args = buildEditorArgs(absPath, sockPath, configuredCommand);
     const child = spawn(args[0] as string, args.slice(1), {
       detached: true,
+      env: this.spawnEnvironment,
       stdio: 'ignore',
       // Never pass note paths through a shell. They are user-controlled filenames
       // and may contain shell metacharacters.

@@ -11,7 +11,7 @@ if (process.platform !== 'linux') {
 const root = process.cwd();
 const home = os.homedir();
 const appImage = path.join(root, 'dist', 'folea-0.0.0.AppImage');
-const icon = path.join(root, 'assets', 'brand', 'folea-icon.svg');
+const icon = path.join(root, 'assets', 'logo', 'app-icon-dark.svg');
 const installDir = path.join(home, '.local', 'share', 'folea');
 const binDir = path.join(home, '.local', 'bin');
 const desktopDir = path.join(home, '.local', 'share', 'applications');
