@@ -25,6 +25,16 @@ describe('buildLinkGraph — basic resolution', () => {
     expect(graph.backlinks('b.typ')).toEqual([{ relPath: 'a.typ', title: 'Note A', kind: 'link' }]);
   });
 
+  it('resolves a target with a query and fragment', () => {
+    const files = new Map([
+      ['a.typ', '#link("b.typ?query=1#fragment")'],
+      ['b.typ', '= B']
+    ]);
+    const graph = buildLinkGraph(files, [meta('a.typ'), meta('b.typ', 'B')]);
+
+    expect(graph.outgoing('a.typ')).toEqual([{ relPath: 'b.typ', title: 'B', kind: 'link' }]);
+  });
+
   it('resolves a relative ../path target', () => {
     const files = new Map([
       ['sub/a.typ', '#link("../root.typ")'],
