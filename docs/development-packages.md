@@ -15,9 +15,9 @@ Get-Content "$(scoop prefix folea-dev)\app\resources\build-info"
 ```
 
 The manifest downloads the immutable GitHub archive for one full commit SHA, verifies its SHA-256,
-then runs `npm ci` and builds the unpacked application locally with Node.js 22. Scoop owns the
-`Folea Dev` shortcut, the `folea-dev` shim, updates, and removal. If Scoop has not enabled its
-`versions` bucket yet, run `scoop bucket add versions` once so it can install `nodejs22`.
+then runs `npm ci` and builds the unpacked application locally with Node.js 22. The Folea bucket
+contains the pinned `nodejs22` build dependency, so no extra bucket is needed. Scoop owns the
+`Folea Dev` shortcut, the `folea-dev` shim, updates, and removal.
 
 ## macOS — Homebrew HEAD
 

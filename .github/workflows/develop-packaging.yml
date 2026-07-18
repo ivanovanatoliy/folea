@@ -67,10 +67,11 @@ jobs:
           export FOLEA_ARCHIVE_SHA256="$(sha256sum source.zip | cut -d' ' -f1)"
           mkdir scoop-manifest
           node scripts/render-scoop-manifest.mjs scoop-manifest/folea-dev.json
+          cp packaging/scoop/nodejs22.json scoop-manifest/nodejs22.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: scoop-manifest
-          path: scoop-manifest/folea-dev.json
+          path: scoop-manifest/
           if-no-files-found: error
           retention-days: 7
 
@@ -216,7 +217,6 @@ jobs:
         run: |
           Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
           Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
-          scoop bucket add versions
           git init -b develop test-bucket
           git -C test-bucket config user.name packaging-ci
           git -C test-bucket config user.email packaging-ci@users.noreply.github.com
@@ -401,7 +401,8 @@ jobs:
             "https://x-access-token:${TOKEN}@github.com/ivanovanatoliy/scoop-folea.git" "$RUNNER_TEMP/scoop-folea"
           mkdir -p "$RUNNER_TEMP/scoop-folea/bucket"
           cp scoop-manifest/folea-dev.json "$RUNNER_TEMP/scoop-folea/bucket/folea-dev.json"
-          git -C "$RUNNER_TEMP/scoop-folea" add bucket/folea-dev.json
+          cp packaging/scoop/nodejs22.json "$RUNNER_TEMP/scoop-folea/bucket/nodejs22.json"
+          git -C "$RUNNER_TEMP/scoop-folea" add bucket/folea-dev.json bucket/nodejs22.json
           git -C "$RUNNER_TEMP/scoop-folea" commit -m "Update Folea to $GITHUB_SHA"
           git -C "$RUNNER_TEMP/scoop-folea" push origin develop
 

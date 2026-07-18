@@ -10,7 +10,7 @@
       "extract_dir": "folea-__FULL_SHA__"
     }
   },
-  "depends": "versions/nodejs22",
+  "depends": "nodejs22",
   "installer": {
     "script": [
       "Push-Location $dir",
