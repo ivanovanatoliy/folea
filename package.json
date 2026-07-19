@@ -62,11 +62,13 @@
     },
     "deb": {
       "packageName": "folea-dev",
-      "artifactName": "folea-dev_${version}_${arch}.${ext}"
+      "artifactName": "folea-dev_${version}_${arch}.${ext}",
+      "afterRemove": "packaging/linux/after-remove.sh"
     },
     "rpm": {
       "packageName": "folea-dev",
-      "artifactName": "folea-dev-${version}.${arch}.${ext}"
+      "artifactName": "folea-dev-${version}.${arch}.${ext}",
+      "afterRemove": "packaging/linux/after-remove.sh"
     }
   },
   "scripts": {
