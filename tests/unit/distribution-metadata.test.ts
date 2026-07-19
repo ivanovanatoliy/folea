@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -21,6 +22,15 @@ describe('package metadata', () => {
     ]) {
       expect(read(file), file).toContain(description);
     }
+  });
+
+  it('keeps AUR source checksums in sync', () => {
+    const desktopHash = createHash('sha256')
+      .update(readFileSync(path.resolve('packaging/aur/folea.desktop')))
+      .digest('hex');
+
+    expect(read('packaging/aur/PKGBUILD')).toContain(`'${desktopHash}'`);
+    expect(read('packaging/aur/.SRCINFO')).toContain(`sha256sums = ${desktopHash}`);
   });
 
   it('ships a purpose-built multi-size Windows icon', () => {
