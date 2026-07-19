@@ -32,8 +32,9 @@ current note in an external editor such as VS Code, Neovim, or whatever you pref
 > signed.**
 
 Package managers are the recommended installation method. Development packages are built from the
-`develop` branch and may contain unstable or incomplete changes. Check the exact source commit with
-`--build-info`.
+`develop` branch and may contain unstable or incomplete changes. Package identifiers retain their
+`-dev` or `-git` suffix, but the installed application and command are always lowercase `folea`.
+Check the exact source commit with `folea --build-info`.
 
 <details>
 <summary><strong>Windows</strong></summary>

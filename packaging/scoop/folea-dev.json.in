@@ -31,6 +31,6 @@
       "Get-ChildItem -LiteralPath $dir -Force | Where-Object Name -ne 'app' | Remove-Item -Recurse -Force"
     ]
   },
-  "bin": [["app\\folea.exe", "folea-dev"]],
-  "shortcuts": [["app\\folea.exe", "Folea Dev"]]
+  "bin": [["app\\folea.exe", "folea"]],
+  "shortcuts": [["app\\folea.exe", "folea"]]
 }

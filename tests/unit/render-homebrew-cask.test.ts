@@ -21,5 +21,8 @@ it('renders an immutable Homebrew cask', () => {
   const cask = readFileSync(output, 'utf8');
   expect(cask).toContain('version "abcdef1234567890abcdef1234567890abcdef12"');
   expect(cask).toContain(`sha256 "${'1'.repeat(64)}"`);
+  expect(cask).toContain('name "folea"');
+  expect(cask).toContain('target: "folea.app"');
+  expect(cask).toContain('target: "folea"');
   expect(cask).not.toMatch(/__[A-Z_]+__/);
 });

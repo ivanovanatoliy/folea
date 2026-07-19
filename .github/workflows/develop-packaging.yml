@@ -179,8 +179,8 @@ jobs:
           chmod +x current/*.AppImage
           current/*.AppImage --appimage-extract >/dev/null
           grep -Fx "SOURCE_COMMIT=$GITHUB_SHA" squashfs-root/resources/build-info
+          grep -Fx 'Name=folea' squashfs-root/folea.desktop
           test -x squashfs-root/AppRun
-          test -f squashfs-root/folea.desktop
       - name: Test DEB install, upgrade and removal
         shell: bash
         run: |
@@ -191,6 +191,8 @@ jobs:
                 apt-get install -y /fixture/*.deb
                 apt-get install -y /current/*.deb
                 test "$(dpkg-query -W -f="\${Status}" folea-dev)" = "install ok installed"
+                command -v folea
+                grep -Fx "Name=folea" /usr/share/applications/folea.desktop
                 grep -Fx "SOURCE_COMMIT=$EXPECTED_SHA" /opt/folea/resources/build-info
                 apt-get purge -y folea-dev
                 ! dpkg-query -W folea-dev
@@ -205,6 +207,8 @@ jobs:
                 dnf install -y /fixture/*.rpm
                 dnf upgrade -y /current/*.rpm
                 rpm -q folea-dev
+                command -v folea
+                grep -Fx "Name=folea" /usr/share/applications/folea.desktop
                 grep -Fx "SOURCE_COMMIT=$EXPECTED_SHA" /opt/folea/resources/build-info
                 dnf remove -y folea-dev
                 ! rpm -q folea-dev
@@ -238,8 +242,8 @@ jobs:
         run: |
           $prefix = scoop prefix folea-dev
           if (!(Test-Path "$prefix\app\folea.exe")) { throw 'Executable is missing' }
-          if (!(Get-Command folea-dev -ErrorAction SilentlyContinue)) { throw 'Shim is missing' }
-          if (!(Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu" -Recurse -Filter 'Folea Dev.lnk')) { throw 'Shortcut is missing' }
+          if (!(Get-Command folea -ErrorAction SilentlyContinue)) { throw 'Shim is missing' }
+          if (!(Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu" -Recurse -Filter 'folea.lnk')) { throw 'Shortcut is missing' }
           if (!(Get-Content "$prefix\app\resources\build-info" | Select-String -SimpleMatch "SOURCE_COMMIT=$env:GITHUB_SHA")) { throw 'Commit metadata is wrong' }
           $process = Start-Process "$prefix\app\folea.exe" -PassThru
           Start-Sleep -Seconds 5
@@ -282,10 +286,10 @@ jobs:
           brew uninstall folea
 
           brew install --cask ivanovanatoliy/folea/folea-dev
-          folea-dev --build-info | grep -Fx "SOURCE_COMMIT=$GITHUB_SHA"
-          test -d "/Applications/Folea Dev.app"
+          folea --build-info | grep -Fx "SOURCE_COMMIT=$GITHUB_SHA"
+          test -d "/Applications/folea.app"
           brew uninstall --cask folea-dev
-          test ! -e "/Applications/Folea Dev.app"
+          test ! -e "/Applications/folea.app"
 
   aur:
     needs: [prepare, test]
@@ -310,6 +314,7 @@ jobs:
               su builder -c "cd /home/builder/aur && makepkg --syncdeps --cleanbuild --noconfirm"
               pacman -U --noconfirm /home/builder/aur/folea-git-*.pkg.tar.zst
               test -x /usr/bin/folea
+              grep -Fx "Name=folea" /usr/share/applications/folea.desktop
               grep -Fx "SOURCE_COMMIT=$EXPECTED_SHA" /opt/folea/resources/build-info
               pacman -Rns --noconfirm folea-git
             '

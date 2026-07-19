@@ -3,7 +3,7 @@ cask "folea-dev" do
   sha256 "__ARCHIVE_SHA256__"
 
   url "https://github.com/ivanovanatoliy/folea/archive/#{version}.zip"
-  name "Folea Dev"
+  name "folea"
   desc "Development build of the keyboard-driven Typst note reader"
   homepage "https://github.com/ivanovanatoliy/folea"
 
@@ -38,8 +38,8 @@ cask "folea-dev" do
     system_command "/usr/bin/codesign", args: ["--force", "--deep", "--sign", "-", app]
   end
 
-  app "folea-#{version}/dist/#{Hardware::CPU.arm? ? "mac-arm64" : "mac"}/folea.app", target: "Folea Dev.app"
-  binary "#{appdir}/Folea Dev.app/Contents/MacOS/folea", target: "folea-dev"
+  app "folea-#{version}/dist/#{Hardware::CPU.arm? ? "mac-arm64" : "mac"}/folea.app", target: "folea.app"
+  binary "#{appdir}/folea.app/Contents/MacOS/folea", target: "folea"
 
   uninstall quit: "dev.folea.app"
 end

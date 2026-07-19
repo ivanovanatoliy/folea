@@ -15,7 +15,7 @@ source=('folea::git+https://github.com/ivanovanatoliy/folea.git#branch=develop'
         'folea.desktop'
         'folea.sh')
 sha256sums=('SKIP'
-            '883b67805321d7549b5835c10a4ae790b7fb93f49abacb8fc276a9da481ba3d6'
+            '8b71db57faab405bcf721d4e6185c5d82c056201896a14b1c9ca23c1bc8d8336'
             '14835d67b937df5874fdf05878bed07ed03bea2c1436b5837753966f2a2820d1')
 
 pkgver() {
