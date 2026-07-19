@@ -4,7 +4,7 @@ cask "folea-dev" do
 
   url "https://github.com/ivanovanatoliy/folea/archive/#{version}.zip"
   name "folea"
-  desc "Development build of the keyboard-driven Typst note reader"
+  desc "Keyboard-driven, minimalist note manager for Typst notes"
   homepage "https://github.com/ivanovanatoliy/folea"
 
   depends_on formula: "node@22"

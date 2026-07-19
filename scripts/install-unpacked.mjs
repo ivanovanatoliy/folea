@@ -80,7 +80,7 @@ const installLinux = async () => {
     desktopFile,
     `[Desktop Entry]
 Name=folea
-Comment=Keyboard-driven Typst note manager
+Comment=Keyboard-driven, minimalist note manager for Typst notes
 Exec=${wrapper}
 Icon=folea
 Terminal=false

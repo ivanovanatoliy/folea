@@ -28,7 +28,7 @@ current note in an external editor such as VS Code, Neovim, or whatever you pref
 
 ## Install
 
-> **Folea is under active development. GitHub Releases are currently test builds and are not
+> **Folea is under active development. GitHub Releases are manually cut from `main` and are not
 > signed.**
 
 Package managers are the recommended installation method. Development packages are built from the

@@ -45,8 +45,11 @@ npm run app:uninstall
 ```
 
 Record which OS artifacts were built and smoke-tested in the PR. Development distribution is
-triggered only from `develop`; it does not use `main`, tags, or GitHub Releases. User installation
-commands are documented in [`README.md`](README.md#install).
+triggered only from `develop`; it never publishes `main`. Stable GitHub Releases are created only
+by manually running the **Release** workflow on the latest `main` commit with a version number
+without the `v` prefix. That workflow creates the tag and Release assets, but does not update Scoop,
+Homebrew, AUR, APT, DNF, or AppImage development channels. User installation commands are
+documented in [`README.md`](README.md#install).
 
 ## Tests
 

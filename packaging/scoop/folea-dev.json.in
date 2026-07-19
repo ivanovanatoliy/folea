@@ -1,6 +1,6 @@
 {
   "version": "__VERSION__",
-  "description": "Development build of Folea from commit __SHORT_SHA__",
+  "description": "Keyboard-driven, minimalist note manager for Typst notes",
   "homepage": "https://github.com/ivanovanatoliy/folea",
   "license": "Apache-2.0",
   "architecture": {

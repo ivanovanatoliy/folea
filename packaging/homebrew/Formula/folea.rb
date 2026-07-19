@@ -1,5 +1,5 @@
 class Folea < Formula
-  desc "Development build of the keyboard-driven Typst note reader"
+  desc "Keyboard-driven, minimalist note manager for Typst notes"
   homepage "https://github.com/ivanovanatoliy/folea"
   head "https://github.com/ivanovanatoliy/folea.git", branch: "develop"
   license "Apache-2.0"

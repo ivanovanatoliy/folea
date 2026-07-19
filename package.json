@@ -1,7 +1,7 @@
 {
   "name": "folea",
   "version": "0.0.0",
-  "description": "Keyboard-driven minimalist note manager for Typst notes.",
+  "description": "Keyboard-driven, minimalist note manager for Typst notes",
   "homepage": "https://github.com/ivanovanatoliy/folea",
   "repository": "https://github.com/ivanovanatoliy/folea.git",
   "main": "out/main/index.js",
@@ -23,6 +23,7 @@
     "files": [
       "out/**",
       "assets/logo/app-icon-dark.svg",
+      "assets/logo/app-icon-windows.ico",
       "package.json",
       "LICENSE",
       "NOTICE"
@@ -47,7 +48,7 @@
       "target": [
         "nsis"
       ],
-      "icon": "assets/logo/app-icon-dark.svg"
+      "icon": "assets/logo/app-icon-windows.ico"
     },
     "linux": {
       "target": [
