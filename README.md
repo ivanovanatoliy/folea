@@ -73,9 +73,9 @@ Debian, Ubuntu, and Linux Mint (APT):
 
 ```bash
 sudo install -d -m 0755 /etc/apt/keyrings
-curl -fsSL https://ivanovanatoliy.github.io/folea-packages/repo-signing-key.asc \
+curl -fsSL https://ivanovanatoliy.github.io/folea/repo-signing-key.asc \
   | sudo tee /etc/apt/keyrings/folea-packages.asc >/dev/null
-curl -fsSL https://ivanovanatoliy.github.io/folea-packages/apt/folea.sources \
+curl -fsSL https://ivanovanatoliy.github.io/folea/apt/folea.sources \
   | sudo tee /etc/apt/sources.list.d/folea.sources >/dev/null
 sudo apt update
 sudo apt install folea-dev
@@ -84,7 +84,7 @@ sudo apt install folea-dev
 Fedora (DNF):
 
 ```bash
-sudo curl -fsSL https://ivanovanatoliy.github.io/folea-packages/rpm/folea.repo \
+sudo curl -fsSL https://ivanovanatoliy.github.io/folea/rpm/folea.repo \
   -o /etc/yum.repos.d/folea.repo
 sudo dnf install folea-dev
 ```

@@ -360,16 +360,12 @@ jobs:
       - name: Assemble and verify signed repositories
         shell: bash
         env:
-          TOKEN: ${{ secrets.PACKAGING_REPOS_TOKEN }}
           PACKAGE_ROOT: ${{ runner.temp }}/folea-packages
           ARTIFACT_DIR: ${{ github.workspace }}/artifacts
           FOLEA_COMMIT_SHA: ${{ github.sha }}
           FOLEA_SHORT_SHA: ${{ needs.prepare.outputs.short_sha }}
           GPG_KEY_ID: ${{ steps.gpg.outputs.key-id }}
         run: |
-          [[ -n "$TOKEN" ]]
-          git clone --branch develop \
-            "https://x-access-token:${TOKEN}@github.com/ivanovanatoliy/folea-packages.git" "$PACKAGE_ROOT"
           bash packaging/scripts/assemble-repositories.sh
           gpg --verify "$PACKAGE_ROOT/SHA256SUMS.asc" "$PACKAGE_ROOT/SHA256SUMS"
           gpg --verify "$PACKAGE_ROOT/apt/dists/develop/InRelease"
@@ -407,17 +403,18 @@ jobs:
               dnf remove -y folea-dev
             '
           done
-      - name: Publish package repositories
+      - name: Upload package site
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+        with:
+          path: ${{ runner.temp }}/folea-packages
+      - name: Publish package manifests
         shell: bash
         env:
           TOKEN: ${{ secrets.PACKAGING_REPOS_TOKEN }}
-          PACKAGE_ROOT: ${{ runner.temp }}/folea-packages
         run: |
+          [[ -n "$TOKEN" ]]
           git config --global user.name folea-packaging[bot]
           git config --global user.email 247982223+folea-packaging[bot]@users.noreply.github.com
-          git -C "$PACKAGE_ROOT" add .
-          git -C "$PACKAGE_ROOT" commit -m "Publish Folea $GITHUB_SHA"
-          git -C "$PACKAGE_ROOT" push origin develop
 
           git clone --branch develop \
             "https://x-access-token:${TOKEN}@github.com/ivanovanatoliy/scoop-folea.git" "$RUNNER_TEMP/scoop-folea"
@@ -439,8 +436,22 @@ jobs:
             git -C "$RUNNER_TEMP/homebrew-folea" push origin develop
           fi
 
-  verify-publication:
+  deploy-pages:
     needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy package site
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
+
+  verify-publication:
+    needs: deploy-pages
     runs-on: ubuntu-latest
     steps:
       - name: Verify stable public URLs
@@ -448,7 +459,7 @@ jobs:
         run: |
           for attempt in {1..30}; do
             if curl --fail --silent --show-error \
-              https://ivanovanatoliy.github.io/folea-packages/appimage/folea-dev-linux-x64.AppImage.build-info \
+              https://ivanovanatoliy.github.io/folea/appimage/folea-dev-linux-x64.AppImage.build-info \
               | grep -Fx "SOURCE_COMMIT=$GITHUB_SHA"; then
               break
             fi
@@ -456,9 +467,9 @@ jobs:
             sleep 10
           done
           curl --fail --silent --show-error --head \
-            https://ivanovanatoliy.github.io/folea-packages/apt/dists/develop/InRelease
+            https://ivanovanatoliy.github.io/folea/apt/dists/develop/InRelease
           curl --fail --silent --show-error --head \
-            https://ivanovanatoliy.github.io/folea-packages/rpm/fedora/44/x86_64/repodata/repomd.xml
+            https://ivanovanatoliy.github.io/folea/rpm/fedora/44/x86_64/repodata/repomd.xml
           curl --fail --silent --show-error \
             https://raw.githubusercontent.com/ivanovanatoliy/scoop-folea/develop/bucket/folea-dev.json \
             | grep -F "$GITHUB_SHA"

@@ -1,5 +1,5 @@
 Types: deb
-URIs: https://ivanovanatoliy.github.io/folea-packages/apt
+URIs: https://ivanovanatoliy.github.io/folea/apt
 Suites: develop
 Components: main
 Architectures: amd64
