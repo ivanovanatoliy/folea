@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=folea
+Comment=Keyboard-driven, minimalist note manager for Typst notes
+Exec=folea
+Icon=folea
+Terminal=false
+Type=Application
+Categories=Utility;Office;
+StartupWMClass=folea

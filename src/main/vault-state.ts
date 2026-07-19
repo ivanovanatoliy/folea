@@ -22,6 +22,7 @@ import {
 } from '../shared/ipc/vault-state';
 import type { VaultPath } from '../shared/ipc/vault';
 import { FOLEA_RENDERER_VERSION, TYPST_COMPILER_VERSION_TAG } from '../shared/build-identity';
+import { mapMovedPath } from '../shared/typst-links';
 import { atomicWriteJson, atomicWriteString, readJsonFile } from './persistence/atomic-file';
 import { isNodeError } from './vault/paths';
 
@@ -143,31 +144,25 @@ export const applyVaultStatePatch = (
 
     case 'pathsMoved': {
       const mappings = new Map(patch.mappings.map((mapping) => [mapping.from, mapping.to]));
-      const mapPath = (relPath: string): string => {
-        const direct = mappings.get(relPath);
-        if (direct) return direct;
-        for (const [from, to] of [...mappings].sort(([a], [b]) => b.length - a.length)) {
-          if (relPath.startsWith(`${from}/`)) return `${to}${relPath.slice(from.length)}`;
-        }
-        return relPath;
-      };
       const recentNotes = current.recentNotes.map((note) => ({
         ...note,
-        relPath: mapPath(note.relPath)
+        relPath: mapMovedPath(note.relPath, mappings)
       }));
       const notePositions: Record<VaultPath, NotePositionState> = {};
       for (const [relPath, position] of Object.entries(current.notePositions)) {
-        const mapped = mapPath(relPath);
+        const mapped = mapMovedPath(relPath, mappings);
         notePositions[mapped] = { ...position, relPath: mapped };
       }
       return {
         ...current,
         updatedAt: now,
-        lastOpenedNote: current.lastOpenedNote ? mapPath(current.lastOpenedNote) : null,
+        lastOpenedNote: current.lastOpenedNote
+          ? mapMovedPath(current.lastOpenedNote, mappings)
+          : null,
         recentNotes,
         notePositions,
         lastCreationTemplate: current.lastCreationTemplate
-          ? mapPath(current.lastCreationTemplate)
+          ? mapMovedPath(current.lastCreationTemplate, mappings)
           : null
       };
     }

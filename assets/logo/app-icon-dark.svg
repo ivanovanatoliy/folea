@@ -1,0 +1,10 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="#1b1b1f"></rect>
+  <g transform="translate(512,733.06) scale(3.2974)">
+      <path d="M0,0 C50,-26 34,-88 0,-118 C-34,-88 -50,-26 0,0 Z" fill="#3f9068" stroke="#1b1b1f" stroke-width="11" stroke-linejoin="round" transform="rotate(-62) scale(1.12,1)"></path>
+      <path d="M0,0 C50,-26 34,-88 0,-118 C-34,-88 -50,-26 0,0 Z" fill="#3f9068" stroke="#1b1b1f" stroke-width="11" stroke-linejoin="round" transform="rotate(62) scale(1.12,1)"></path>
+      <path d="M0,0 C50,-26 34,-88 0,-118 C-34,-88 -50,-26 0,0 Z" fill="#7fd3a6" stroke="#1b1b1f" stroke-width="11" stroke-linejoin="round" transform="rotate(-28) scale(1,1.14)"></path>
+      <path d="M0,0 C50,-26 34,-88 0,-118 C-34,-88 -50,-26 0,0 Z" fill="#7fd3a6" stroke="#1b1b1f" stroke-width="11" stroke-linejoin="round" transform="rotate(28) scale(1,1.14)"></path>
+      <path d="M0,0 C50,-26 34,-88 0,-118 C-34,-88 -50,-26 0,0 Z" fill="#7fd3a6" stroke="#1b1b1f" stroke-width="11" stroke-linejoin="round" transform="rotate(0) scale(0.96,1.28)"></path>
+  </g>
+</svg>

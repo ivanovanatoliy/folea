@@ -4,6 +4,7 @@ import path from 'node:path';
 import type { VaultReferenceImpact, VaultSnapshot } from '../../shared/ipc/vault';
 import {
   cleanupTypstReferences,
+  mapMovedPath,
   parseTypstReferences,
   resolveTypstReferencePath,
   rewriteTypstReferences
@@ -68,7 +69,7 @@ export class VaultReferenceService {
     const results = await mapWithConcurrency(snapshot.notes, VAULT_IO_CONCURRENCY, async (note) => {
       const source = sources.get(note.relPath);
       if (source === undefined) return { updated: 0, warnings: [] };
-      const nextPath = mapManagedPath(note.relPath, mappings);
+      const nextPath = mapMovedPath(note.relPath, mappings);
       const result = rewriteTypstReferences(source, note.relPath, nextPath, mappings);
       if (result.source === source) return result;
       try {
@@ -94,12 +95,3 @@ export class VaultReferenceService {
     };
   }
 }
-
-const mapManagedPath = (relPath: string, mappings: ReadonlyMap<string, string>): string => {
-  const direct = mappings.get(relPath);
-  if (direct) return direct;
-  for (const [from, to] of [...mappings].sort(([left], [right]) => right.length - left.length)) {
-    if (relPath.startsWith(`${from}/`)) return `${to}${relPath.slice(from.length)}`;
-  }
-  return relPath;
-};

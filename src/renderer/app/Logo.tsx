@@ -1,5 +1,5 @@
-import logoDarkUrl from '../../../assets/brand/folea-logo-dark.svg?url';
-import logoLightUrl from '../../../assets/brand/folea-logo-light.svg?url';
+import logoDarkUrl from '../../../assets/logo/logo-dark.svg?url';
+import logoLightUrl from '../../../assets/logo/logo-light.svg?url';
 
 interface LogoProps {
   readonly theme: 'light' | 'dark';

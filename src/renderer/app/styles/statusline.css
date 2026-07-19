@@ -22,6 +22,10 @@
   color: var(--folea-text);
 }
 
+.statusline:not(:has(.statusline-page)) .statusline-mode {
+  margin-left: auto;
+}
+
 .statusline-page {
   display: inline-block;
   margin-left: auto;

@@ -2,12 +2,27 @@ import { describe, expect, it } from 'vitest';
 
 import {
   cleanupTypstReferences,
+  mapMovedPath,
   parseTypstReferences,
   rewriteTypstReferences
 } from '../../src/shared/typst-links';
 import { buildLinkGraph } from '../../src/renderer/nav/link-graph';
 
 describe('managed Typst references', () => {
+  it('maps exact and longest-parent moved paths', () => {
+    const mappings = new Map([
+      ['old', 'archive'],
+      ['old/nested', 'deep'],
+      ['exact.typ', 'moved.typ']
+    ]);
+
+    expect(mapMovedPath('exact.typ', mappings)).toBe('moved.typ');
+    expect(mapMovedPath('old/nested', mappings)).toBe('deep');
+    expect(mapMovedPath('old/nested/note.typ', mappings)).toBe('deep/note.typ');
+    expect(mapMovedPath('old/other.typ', mappings)).toBe('archive/other.typ');
+    expect(mapMovedPath('unchanged.typ', mappings)).toBe('unchanged.typ');
+  });
+
   it('returns exact ranges and ignores comments and strings containing fake markup', () => {
     const source =
       '// #link("ignored.typ")\n#link("real.typ")[Real]\n#let x = "#include \\"fake.typ\\""';

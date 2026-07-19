@@ -1,4 +1,5 @@
 import type { NoteMeta, VaultPath } from '../../shared/ipc/vault';
+import { resolveTypstReferencePath } from '../../shared/typst-links';
 import { parseRefs } from './link-parser';
 import type { LinkEdgeKind } from './link-parser';
 
@@ -28,37 +29,6 @@ export interface LinkGraphIndex {
   snapshot(): LinkGraph;
 }
 
-// Collapse `.` and `..` components. Returns null if the path escapes the vault root.
-function normalizePath(raw: string): string | null {
-  const resolved: string[] = [];
-  for (const part of raw.split('/')) {
-    if (part === '' || part === '.') {
-      continue;
-    } else if (part === '..') {
-      if (resolved.length === 0) {
-        return null;
-      }
-      resolved.pop();
-    } else {
-      resolved.push(part);
-    }
-  }
-  return resolved.join('/');
-}
-
-function resolveTarget(rawTarget: string, fromDir: string): string | null {
-  if (rawTarget.startsWith('/')) {
-    return normalizePath(rawTarget.slice(1));
-  }
-  const joined = fromDir.length > 0 ? `${fromDir}/${rawTarget}` : rawTarget;
-  return normalizePath(joined);
-}
-
-function dirnameOf(relPath: string): string {
-  const idx = relPath.lastIndexOf('/');
-  return idx >= 0 ? relPath.slice(0, idx) : '';
-}
-
 /**
  * Resolve a raw `#link()` href (as written in Typst, relative to the linking note's
  * directory) to an actual vault-root-relative note path that exists in `noteSet`.
@@ -73,10 +43,7 @@ export function resolveNoteHref(
   fromRelPath: string,
   noteSet: ReadonlySet<string>
 ): string | null {
-  const rawTarget = rawHref.split(/[?#]/)[0] ?? rawHref;
-  if (rawTarget.length === 0) return null;
-
-  let resolved = resolveTarget(rawTarget, dirnameOf(fromRelPath));
+  let resolved = resolveTypstReferencePath(rawHref, fromRelPath);
   if (resolved === null) return null;
 
   if (!resolved.endsWith('.typ') && !noteSet.has(resolved)) {

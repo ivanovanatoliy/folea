@@ -1,0 +1,36 @@
+{
+  "version": "__VERSION__",
+  "description": "Keyboard-driven, minimalist note manager for Typst notes",
+  "homepage": "https://github.com/ivanovanatoliy/folea",
+  "license": "Apache-2.0",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/ivanovanatoliy/folea/archive/__FULL_SHA__.zip",
+      "hash": "__ARCHIVE_SHA256__",
+      "extract_dir": "folea-__FULL_SHA__"
+    }
+  },
+  "depends": "nodejs22",
+  "installer": {
+    "script": [
+      "Push-Location $dir",
+      "$env:CSC_IDENTITY_AUTO_DISCOVERY = 'false'",
+      "$env:FOLEA_COMMIT_SHA = '__FULL_SHA__'",
+      "$env:FOLEA_COMMIT_COUNT = '__COMMIT_COUNT__'",
+      "$env:FOLEA_BUILD_TIMESTAMP = '__TIMESTAMP__'",
+      "$env:FOLEA_SOURCE_BRANCH = 'develop'",
+      "$env:FOLEA_WORKFLOW_RUN_URL = '__WORKFLOW_RUN_URL__'",
+      "$builtVersion = node scripts/prepare-development-build.mjs",
+      "if ($builtVersion -ne '__VERSION__') { throw \"Unexpected build version: $builtVersion\" }",
+      "npm ci",
+      "npm version $builtVersion --no-git-tag-version --allow-same-version",
+      "npm run build",
+      "npx electron-builder --dir --win --x64 --publish never",
+      "Pop-Location",
+      "Move-Item -LiteralPath (Join-Path $dir 'dist\\win-unpacked') -Destination (Join-Path $dir 'app')",
+      "Get-ChildItem -LiteralPath $dir -Force | Where-Object Name -ne 'app' | Remove-Item -Recurse -Force"
+    ]
+  },
+  "bin": [["app\\folea.exe", "folea"]],
+  "shortcuts": [["app\\folea.exe", "folea"]]
+}

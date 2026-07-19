@@ -201,7 +201,7 @@ export const resolveTypstReferencePath = (
   );
 };
 
-const mapPath = (relPath: string, mappings: ReadonlyMap<string, string>): string => {
+export const mapMovedPath = (relPath: string, mappings: ReadonlyMap<string, string>): string => {
   const direct = mappings.get(relPath);
   if (direct) return direct;
   const parents = [...mappings.keys()].sort((a, b) => b.length - a.length);
@@ -240,8 +240,8 @@ export const rewriteTypstReferences = (
     const resolved = resolveTypstReferencePath(ref.rawTarget, fromBefore);
     if (!resolved) continue;
     const extensionless = !parts.path.endsWith('.typ');
-    const mapped = mapPath(resolved, mappings);
-    const mappedWithExtension = extensionless ? mapPath(`${resolved}.typ`, mappings) : mapped;
+    const mapped = mapMovedPath(resolved, mappings);
+    const mappedWithExtension = extensionless ? mapMovedPath(`${resolved}.typ`, mappings) : mapped;
     const effective =
       extensionless && mappedWithExtension !== `${resolved}.typ`
         ? mappedWithExtension.slice(0, -'.typ'.length)

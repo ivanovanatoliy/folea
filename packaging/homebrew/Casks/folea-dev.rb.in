@@ -1,0 +1,45 @@
+cask "folea-dev" do
+  version "__FULL_SHA__"
+  sha256 "__ARCHIVE_SHA256__"
+
+  url "https://github.com/ivanovanatoliy/folea/archive/#{version}.zip"
+  name "folea"
+  desc "Keyboard-driven, minimalist note manager for Typst notes"
+  homepage "https://github.com/ivanovanatoliy/folea"
+
+  depends_on formula: "node@22"
+
+  preflight do
+    source = staged_path/"folea-#{version}"
+    node_bin = HOMEBREW_PREFIX/"opt/node@22/bin"
+    env = {
+      "CSC_IDENTITY_AUTO_DISCOVERY" => "false",
+      "FOLEA_COMMIT_SHA"            => version.to_s,
+      "FOLEA_COMMIT_COUNT"          => "__COMMIT_COUNT__",
+      "FOLEA_BUILD_TIMESTAMP"       => "__TIMESTAMP__",
+      "FOLEA_SOURCE_BRANCH"         => "develop",
+      "FOLEA_WORKFLOW_RUN_URL"      => "__WORKFLOW_RUN_URL__",
+      "PATH"                        => "#{node_bin}:#{ENV.fetch("PATH")}",
+    }
+
+    system_command "#{node_bin}/node",
+                   args: ["scripts/prepare-development-build.mjs"], chdir: source, env: env
+    system_command "#{node_bin}/npm", args: ["ci"], chdir: source, env: env
+    system_command "#{node_bin}/npm",
+                   args: ["version", "__VERSION__", "--no-git-tag-version", "--allow-same-version"],
+                   chdir: source, env: env
+    system_command "#{node_bin}/npm", args: ["run", "build"], chdir: source, env: env
+    system_command "#{node_bin}/npx",
+                   args: ["electron-builder", "--dir", "--mac", "--#{Hardware::CPU.arm? ? "arm64" : "x64"}",
+                          "--publish", "never"],
+                   chdir: source, env: env
+
+    app = source/"dist"/(Hardware::CPU.arm? ? "mac-arm64" : "mac")/"folea.app"
+    system_command "/usr/bin/codesign", args: ["--force", "--deep", "--sign", "-", app]
+  end
+
+  app "folea-#{version}/dist/#{Hardware::CPU.arm? ? "mac-arm64" : "mac"}/folea.app", target: "folea.app"
+  binary "#{appdir}/folea.app/Contents/MacOS/folea", target: "folea"
+
+  uninstall quit: "dev.folea.app"
+end
