@@ -26,6 +26,32 @@ current note in an external editor such as VS Code, Neovim, or whatever you pref
   </tr>
 </table>
 
+## Functionality
+
+### Notes and templates
+
+Press `Ctrl+n` to create a note beside the current one, or use `%` in the file tree to create it at
+the selected location. Folea adds `.typ` automatically and lets you start empty or choose a template
+from `<vault>/_templates/*.typ`. Create and edit template files in your external editor, and manage
+them from the command palette.
+
+### Rendering and search
+
+Notes render in-app and update when their source, imports, or includes change. Compile errors keep
+the last successful rendering visible while showing diagnostics. `Ctrl+p` lists recent notes and
+searches vault contents, `/` searches the current note, and full-vault search is in the command
+palette.
+
+### Links and outline
+
+Press `b` to browse backlinks and outgoing `#link`, `#import`, and `#include` references, or `o` to
+jump through the heading outline. Rendered links are clickable.
+
+### Reading mode
+
+Use Vim-style keys to scroll, jump, and zoom. Press `s` for caret navigation over rendered text;
+visual mode selects text for copying, while `Enter` or `gd` follows a link.
+
 ## Install
 
 > **Folea is under active development. GitHub Releases are manually cut from `main` and are not
