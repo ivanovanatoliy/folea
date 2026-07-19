@@ -230,11 +230,7 @@ npm run rebuild
 
 `npm run test:e2e` launches Electron through Playwright. 
 
-## Contributing
-
-The repository is currently **read-only** — no external contributions are accepted while core
-features are being built. Issues and PRs will be ignored for now. This will change once the
-project reaches a stable baseline; the notice here will be updated accordingly.
+See [Contributing](CONTRIBUTING.md) before opening a pull request.
 
 ## License
 
