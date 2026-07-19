@@ -45,8 +45,8 @@ npm run app:uninstall
 ```
 
 Record which OS artifacts were built and smoke-tested in the PR. Development distribution is
-triggered only from `develop`; it does not use `main`, tags, or GitHub Releases. See
-[`docs/development-packages.md`](docs/development-packages.md).
+triggered only from `develop`; it does not use `main`, tags, or GitHub Releases. User installation
+commands are documented in [`README.md`](README.md#install).
 
 ## Tests
 

@@ -10,53 +10,101 @@
 notes. It is a read/navigation shell for a plain directory of `.typ` files: open a vault,
 search, jump, browse links, and read rendered Typst.
 
-folea **does not edit notes in-app**. The `editor.open` command (`<C-e>` by default) launches the
-user's external terminal/editor command, normally Neovim with tinymist.
+folea **does not edit notes in-app**. The **open editor** command (`<C-e>` by default) opens the
+current note in an external editor such as VS Code, Neovim, or whatever you prefer.
 
 ## Screenshots
 
-![start screen](assets/screenshots/start_screen.png)
-
-![tree](assets/screenshots/tree.png)
-
-![palette](assets/screenshots/palette.png)
-
-![editor open](assets/screenshots/editor_open.png)
+<table>
+  <tr>
+    <td><a href="assets/screenshots/start_screen.png"><img src="assets/screenshots/start_screen.png" alt="Start screen"></a></td>
+    <td><a href="assets/screenshots/tree.png"><img src="assets/screenshots/tree.png" alt="File tree"></a></td>
+  </tr>
+  <tr>
+    <td><a href="assets/screenshots/palette.png"><img src="assets/screenshots/palette.png" alt="Command palette"></a></td>
+    <td><a href="assets/screenshots/editor_open.png"><img src="assets/screenshots/editor_open.png" alt="External editor"></a></td>
+  </tr>
+</table>
 
 ## Install
 
-### Development packages
+> **Folea is under active development. GitHub Releases are currently test builds and are not
+> signed.**
 
-> **These packages track Folea's `develop` branch and may contain unstable or incomplete changes.**
+Package managers are the recommended installation method. Development packages are built from the
+`develop` branch and may contain unstable or incomplete changes. Check the exact source commit with
+`--build-info`.
 
-Scoop, Homebrew HEAD, AUR, authenticated APT/DNF repositories, and AppImage instructions are in
-[Development packages](docs/development-packages.md). Every installed build exposes its exact source
-commit through `--build-info`.
+<details>
+<summary><strong>Windows</strong></summary>
+
+Install with [Scoop](https://scoop.sh/). The package builds an exact `develop` commit locally:
+
+```powershell
+scoop bucket add folea https://github.com/ivanovanatoliy/scoop-folea
+scoop install folea-dev
+```
+
+</details>
+
+<details>
+<summary><strong>macOS</strong></summary>
+
+Install the app with [Homebrew](https://brew.sh/). The cask builds an exact `develop` commit locally:
+
+```bash
+brew install --cask ivanovanatoliy/folea/folea-dev
+```
+
+The app uses an ad-hoc signature rather than an Apple Developer certificate or notarization.
+
+</details>
+
+<details>
+<summary><strong>Linux</strong></summary>
+
+Arch Linux, Manjaro, and EndeavourOS ([AUR](https://aur.archlinux.org/packages/folea-git)):
+
+```bash
+yay -S folea-git
+```
+
+Debian, Ubuntu, and Linux Mint (APT):
+
+```bash
+sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://ivanovanatoliy.github.io/folea-packages/repo-signing-key.asc \
+  | sudo tee /etc/apt/keyrings/folea-packages.asc >/dev/null
+curl -fsSL https://ivanovanatoliy.github.io/folea-packages/apt/folea.sources \
+  | sudo tee /etc/apt/sources.list.d/folea.sources >/dev/null
+sudo apt update
+sudo apt install folea-dev
+```
+
+Fedora (DNF):
+
+```bash
+sudo curl -fsSL https://ivanovanatoliy.github.io/folea-packages/rpm/folea.repo \
+  -o /etc/yum.repos.d/folea.repo
+sudo dnf install folea-dev
+```
+
+</details>
 
 ### From source
+
+Clone the `develop` branch, then build and install Folea for the current user:
 
 ```bash
 npm install
 npm run app:install
-npm run app:uninstall 
 ```
 
-`app:install` builds an unpacked app and registers it with the OS: 
-- on Linux it writes
-`~/.local/share/folea/unpacked`, `~/.local/bin/folea`, the icon, and
-`~/.local/share/applications/folea.desktop`; 
-- on macOS it copies `folea.app` to `~/Applications`;
-- on Windows it copies the app to `%LOCALAPPDATA%\Programs\folea` and creates a Start Menu shortcut.
-
-### Build a package
+The install script builds the unpacked app and registers it with the OS. To remove it:
 
 ```bash
-npm run package 
+npm run app:uninstall
 ```
-
-Targets are Linux AppImage + deb, Windows NSIS, and macOS dmg. Packages are unsigned — on
-macOS use **Open Anyway** in System Settings → Privacy & Security; on Windows SmartScreen may require
-**More info → Run anyway**.
 
 ## Configuration
 
@@ -76,17 +124,23 @@ search.inFileCaseSensitive = false
 theme = dark
 ```
 
+### Editor command
+
 `editor.command` opens the current note when you press `<C-e>`. It defaults to VS Code
 (`code --reuse-window`). `%FILE%` is replaced with the note path; `FOLEA_EDITOR_CMD` env var
 overrides it at runtime.
 
-**VS Code** (default):
+<details>
+<summary><strong>VS Code (default)</strong></summary>
 
 ```ini
 editor.command = code --reuse-window %FILE%
 ```
 
-**Neovim**:
+</details>
+
+<details>
+<summary><strong>Neovim</strong></summary>
 
 ```ini
 editor.command = kitty -e nvim --listen %SOCK% %FILE%
@@ -95,6 +149,10 @@ editor.command = kitty -e nvim --listen %SOCK% %FILE%
 `%SOCK%` is replaced with a vault-scoped socket path. With `--listen`, folea reuses an
 already-open nvim session — subsequent `editor.open` calls switch the buffer instead of opening
 a new window. Omit `%SOCK%` if you don't need session reuse.
+
+</details>
+
+### Key bindings
 
 `keys.config`:
 
@@ -170,15 +228,6 @@ npm run rebuild
 ```
 
 `npm run test:e2e` launches Electron through Playwright. 
-
-### Performance measurements
-
-`npm run measure:baselines` writes machine-readable results to `.perf-results/`. The link-graph
-measurement uses fixed synthetic vaults of 20, 50, and 100 notes by default; override them with
-`FOLEA_GRAPH_VAULT_SIZES`. The input metric is intentionally named `input-next-frame`: it measures
-keydown dispatch through the next animation-frame callback and is a responsiveness proxy, not a
-compositor-paint timestamp. Committed budgets and reference measurements live in
-`performance/baselines.json`.
 
 ## Contributing
 
