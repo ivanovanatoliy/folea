@@ -373,7 +373,7 @@ jobs:
           bash packaging/scripts/assemble-repositories.sh
           gpg --verify "$PACKAGE_ROOT/SHA256SUMS.asc" "$PACKAGE_ROOT/SHA256SUMS"
           gpg --verify "$PACKAGE_ROOT/apt/dists/develop/InRelease"
-          sudo rpm --import "$PACKAGE_ROOT/repo-signing-key.asc"
+          rpm --import "$PACKAGE_ROOT/repo-signing-key.asc"
           rpmkeys --checksig "$ARTIFACT_DIR"/*.rpm
           for fedora in 43 44; do
             gpg --verify "$PACKAGE_ROOT/rpm/fedora/$fedora/x86_64/repodata/repomd.xml.asc" \
