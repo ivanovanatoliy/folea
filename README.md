@@ -44,8 +44,10 @@ palette.
 
 ### Links and outline
 
+Link notes with native Typst syntax such as `#link("other.typ")[Other]`; Folea follows these inside
+the vault (`[[...]]` is not supported), while PDF export keeps the path as an external file link.
 Press `b` to browse backlinks and outgoing `#link`, `#import`, and `#include` references, or `o` to
-jump through the heading outline. Rendered links are clickable.
+jump through the heading outline.
 
 ### Reading mode
 
