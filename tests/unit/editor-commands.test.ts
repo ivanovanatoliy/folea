@@ -21,6 +21,8 @@ const makeMinimalContext = (editor: EditorView): CommandContext => {
 
   return {
     document: {
+      historyBack: vi.fn(),
+      historyForward: vi.fn(),
       scrollByLines: vi.fn(),
       scrollByViewport: vi.fn(),
       scrollToStart: vi.fn(),

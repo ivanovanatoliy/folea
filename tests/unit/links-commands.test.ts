@@ -37,6 +37,8 @@ const makeLinksView = (): {
 
 const makeContext = (links: LinksView): CommandContext => ({
   document: {
+    historyBack: vi.fn(),
+    historyForward: vi.fn(),
     scrollByLines: vi.fn(),
     scrollByViewport: vi.fn(),
     scrollToStart: vi.fn(),

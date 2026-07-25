@@ -37,10 +37,16 @@ interface NoteControllerOptions {
 export interface NoteController {
   beginNavigation(): number;
   isCurrent(generation: number): boolean;
-  openWithState(relPath: string, generation: number, state?: VaultStateFileV1): Promise<void>;
+  openWithState(
+    relPath: string,
+    generation: number,
+    state?: VaultStateFileV1,
+    positionOverride?: NotePositionState
+  ): Promise<void>;
   renderSelected(generation: number, notes?: readonly NoteMeta[]): Promise<void>;
-  select(relPath: string): Promise<void>;
+  select(relPath: string, positionOverride?: NotePositionState): Promise<void>;
   open(relPath: string): void;
+  capturePosition(): NotePositionState | undefined;
   savePosition(): void;
   flushPosition(): Promise<void>;
   clearPrefetch(): void;
@@ -76,7 +82,7 @@ export const createNoteController = (options: NoteControllerOptions): NoteContro
           : 0,
       zoomMode: zoom.mode as NoteZoomMode,
       zoomLevel: zoom.level,
-      caretSpanIndex: null,
+      caretSpanIndex: surface.getCaretEngine().getSpanIndex(),
       updatedAt: new Date().toISOString()
     };
     return state;
@@ -116,14 +122,17 @@ export const createNoteController = (options: NoteControllerOptions): NoteContro
   const openWithState = async (
     relPath: string,
     current: number,
-    state?: VaultStateFileV1
+    state?: VaultStateFileV1,
+    positionOverride?: NotePositionState
   ): Promise<void> => {
     await flushPosition();
     if (current !== generation) return;
     positionDebounce.dispose();
-    const vaultState = state ?? (await options.loadVaultState());
+    const position =
+      positionOverride ??
+      state?.notePositions[relPath] ??
+      (await options.loadVaultState()).notePositions[relPath];
     if (current !== generation) return;
-    const position = vaultState.notePositions[relPath];
     options.setPendingZoomRestore({
       relPath,
       state: position
@@ -178,13 +187,13 @@ export const createNoteController = (options: NoteControllerOptions): NoteContro
     options.getSurface()?.render(nextPath);
     options.setCurrentSource(source);
   };
-  const select = async (relPath: string): Promise<void> => {
+  const select = async (relPath: string, positionOverride?: NotePositionState): Promise<void> => {
     const current = ++generation;
     if (!options.notes().some((note) => note.relPath === relPath)) {
       await renderSelected(current);
       return;
     }
-    await openWithState(relPath, current);
+    await openWithState(relPath, current, undefined, positionOverride);
   };
   const clearPrefetch = (): void => {
     if (prefetchTimer !== undefined) clearTimeout(prefetchTimer);
@@ -217,6 +226,7 @@ export const createNoteController = (options: NoteControllerOptions): NoteContro
     open(relPath): void {
       void select(relPath);
     },
+    capturePosition,
     savePosition,
     flushPosition,
     clearPrefetch,

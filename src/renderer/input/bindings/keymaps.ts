@@ -1,6 +1,8 @@
 import type { Keymap } from '../keymap';
 
 export const DOCUMENT_KEYMAP: Keymap = new Map([
+  ['Backspace', 'document.historyBack'],
+  ['<S-Backspace>', 'document.historyForward'],
   ['j', 'document.scrollLineDown'],
   ['k', 'document.scrollLineUp'],
   ['h', 'document.scrollLeft'],
@@ -125,6 +127,8 @@ export const LINKS_KEYMAP: Keymap = new Map([
 ]);
 
 export const CARET_KEYMAP: Keymap = new Map([
+  ['Backspace', 'document.historyBack'],
+  ['<S-Backspace>', 'document.historyForward'],
   ['j', 'caret.moveDown'],
   ['k', 'caret.moveUp'],
   ['h', 'caret.moveLeft'],
@@ -158,6 +162,8 @@ export const CARET_KEYMAP: Keymap = new Map([
 ]);
 
 export const VISUAL_KEYMAP: Keymap = new Map([
+  ['Backspace', 'document.historyBack'],
+  ['<S-Backspace>', 'document.historyForward'],
   ['j', 'visual.extendDown'],
   ['k', 'visual.extendUp'],
   ['h', 'visual.extendLeft'],

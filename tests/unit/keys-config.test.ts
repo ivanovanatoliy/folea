@@ -11,6 +11,8 @@ import { buildBindingIndex } from '../../src/renderer/input/binding-index';
 const known = new Set([
   'document.scrollLineDown',
   'document.scrollHalfDown',
+  'document.historyBack',
+  'document.historyForward',
   'view.toggleTree',
   'editor.open',
   'cache.clearApplication',
@@ -19,15 +21,23 @@ const known = new Set([
 
 const defaults = (): KeymapSet => ({
   document: new Map([
+    ['Backspace', 'document.historyBack'],
+    ['<S-Backspace>', 'document.historyForward'],
     ['j', 'document.scrollLineDown'],
     ['<C-d>', 'document.scrollHalfDown'],
     ['<C-e>', 'editor.open']
   ]),
   caret: new Map([
+    ['Backspace', 'document.historyBack'],
+    ['<S-Backspace>', 'document.historyForward'],
     ['j', 'caret.moveDown'],
     ['<C-e>', 'editor.open']
   ]),
-  visual: new Map([['<C-e>', 'editor.open']]),
+  visual: new Map([
+    ['Backspace', 'document.historyBack'],
+    ['<S-Backspace>', 'document.historyForward'],
+    ['<C-e>', 'editor.open']
+  ]),
   tree: new Map(),
   treeSearch: new Map(),
   palette: new Map(),
@@ -107,6 +117,20 @@ describe('keys.config parser', () => {
     expect(parseKeysConfig('document.scrollHalfDown Space', known).overrides[0]?.chord).toBe(
       'Space'
     );
+  });
+
+  it('accepts and applies Shift+Backspace in every default reading context', () => {
+    expect(isValidChord('<S-Backspace>')).toBe(true);
+    const parsed = parseKeysConfig('document.historyForward F8', known);
+    const { keymaps, warnings } = applyKeysConfigOverrides(defaults(), parsed);
+
+    expect(warnings).toEqual([]);
+    expect(keymaps.document.get('<S-Backspace>')).toBeUndefined();
+    expect(keymaps.caret.get('<S-Backspace>')).toBeUndefined();
+    expect(keymaps.visual.get('<S-Backspace>')).toBeUndefined();
+    expect(keymaps.document.get('F8')).toBe('document.historyForward');
+    expect(keymaps.caret.get('F8')).toBe('document.historyForward');
+    expect(keymaps.visual.get('F8')).toBe('document.historyForward');
   });
 });
 

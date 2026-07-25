@@ -205,6 +205,7 @@ key used for remapping.
 |---|---|
 | `j` / `k` | Scroll down / up |
 | `h` / `l` | Scroll left / right |
+| `Backspace` / `Shift+Backspace` | Navigate back / forward |
 | `Ctrl+d` / `Ctrl+u` | Scroll half page down / up |
 | `gg` / `G` | Jump to top / bottom |
 | `n` / `N` | Next / previous search match |
@@ -234,6 +235,7 @@ key used for remapping.
 | Key | Action |
 |---|---|
 | `h` / `j` / `k` / `l` | Move caret |
+| `Backspace` / `Shift+Backspace` | Navigate back / forward |
 | `{` / `}` | Previous / next paragraph |
 | `gg` / `G` | Document start / end |
 | `v` | Enter visual selection |

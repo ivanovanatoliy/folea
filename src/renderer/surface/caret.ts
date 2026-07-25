@@ -12,6 +12,8 @@ export interface CaretEngine {
   enable(): void;
   disable(): void;
   readonly enabled: boolean;
+  getSpanIndex(): number | null;
+  restoreSpanIndex(index: number | null): void;
   moveDown(): void;
   moveUp(): void;
   moveLeft(): void;
@@ -381,6 +383,28 @@ export const createCaretEngine = (
     },
     get enabled(): boolean {
       return _enabled;
+    },
+    getSpanIndex(): number | null {
+      if (!_enabled || _caretPos < 0) return null;
+      const index = charPosToTselIndex(_caretPos);
+      return index < 0 ? null : index;
+    },
+    restoreSpanIndex(index: number | null): void {
+      if (
+        index === null ||
+        !Number.isInteger(index) ||
+        index < 0 ||
+        index >= _tselElements.length
+      ) {
+        return;
+      }
+      const pos = tselIndexToFirstCharPos(index);
+      if (pos < 0) return;
+      _caretPos = pos;
+      if (_enabled) {
+        ensureVisiblePos(_caretPos);
+        repaint();
+      }
     },
     moveDown(): void {
       const ti = charPosToTselIndex(_caretPos);

@@ -24,6 +24,8 @@ import type {
 import { normalizeChord } from '../../src/renderer/input/keys';
 
 const makeView = () => {
+  const historyBack = vi.fn();
+  const historyForward = vi.fn();
   const scrollByLines = vi.fn();
   const scrollByViewport = vi.fn();
   const scrollToStart = vi.fn();
@@ -35,6 +37,8 @@ const makeView = () => {
   const prevMatch = vi.fn().mockReturnValue(true);
   const clearSearch = vi.fn();
   const view: DocumentView = {
+    historyBack,
+    historyForward,
     scrollByLines,
     scrollByViewport,
     scrollToStart,
@@ -48,6 +52,8 @@ const makeView = () => {
   };
   return {
     view,
+    historyBack,
+    historyForward,
     scrollByLines,
     scrollByViewport,
     scrollToStart,
@@ -437,6 +443,26 @@ describe('chord normalization', () => {
     ).toBe('<S-Space>');
   });
 
+  it('normalizes Backspace and Shift+Backspace as distinct named chords', () => {
+    expect(
+      normalizeChord({
+        key: 'Backspace',
+        ctrlKey: false,
+        altKey: false,
+        metaKey: false
+      })
+    ).toBe('Backspace');
+    expect(
+      normalizeChord({
+        key: 'Backspace',
+        ctrlKey: false,
+        altKey: false,
+        metaKey: false,
+        shiftKey: true
+      })
+    ).toBe('<S-Backspace>');
+  });
+
   it('modifier-only event returns null', () => {
     expect(
       normalizeChord({ key: 'Control', ctrlKey: true, altKey: false, metaKey: false })
@@ -574,6 +600,24 @@ describe('headless dispatch — tree commands', () => {
 });
 
 describe('headless dispatch — document commands', () => {
+  it('Backspace and Shift+Backspace navigate history in reading contexts', () => {
+    const { stack, historyBack, historyForward, dispatcher } = makeSetup();
+
+    expect(dispatcher.dispatch('Backspace')).toBe('handled');
+    expect(dispatcher.dispatch('<S-Backspace>')).toBe('handled');
+
+    stack.push({ name: 'caret', keymap: CARET_KEYMAP });
+    expect(dispatcher.dispatch('Backspace')).toBe('handled');
+    expect(dispatcher.dispatch('<S-Backspace>')).toBe('handled');
+
+    stack.push({ name: 'visual', keymap: VISUAL_KEYMAP });
+    expect(dispatcher.dispatch('Backspace')).toBe('handled');
+    expect(dispatcher.dispatch('<S-Backspace>')).toBe('handled');
+
+    expect(historyBack).toHaveBeenCalledTimes(3);
+    expect(historyForward).toHaveBeenCalledTimes(3);
+  });
+
   it('j → scrollByLines(1)', () => {
     const { scrollByLines, dispatcher } = makeSetup();
     expect(dispatcher.dispatch('j')).toBe('handled');

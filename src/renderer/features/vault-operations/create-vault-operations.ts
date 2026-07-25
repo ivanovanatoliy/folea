@@ -1,6 +1,10 @@
 import type { Accessor, Setter } from 'solid-js';
 
-import { parseVaultEntryName, type VaultTemplate } from '../../../shared/ipc/vault';
+import {
+  parseVaultEntryName,
+  type VaultPathMapping,
+  type VaultTemplate
+} from '../../../shared/ipc/vault';
 import type { VaultStateFileV1 } from '../../../shared/ipc/vault-state';
 import { rewriteTypstReferences } from '../../../shared/typst-links';
 import type { TreeRow } from '../../app/tree-model';
@@ -34,7 +38,8 @@ interface VaultOperationsOptions {
     destructive?: boolean
   ) => Promise<boolean>;
   readonly refreshVault: (state?: VaultStateFileV1) => Promise<void>;
-  readonly selectNote: (relPath: string) => Promise<void>;
+  readonly selectNote: (relPath: string, intent?: 'record' | 'replace') => Promise<void>;
+  readonly remapNavigationHistory: (mappings: readonly VaultPathMapping[]) => void;
   readonly openTemplateManager: () => void;
   readonly reportError: (error: unknown) => void;
   readonly reportWarnings: (warnings: readonly string[]) => void;
@@ -161,12 +166,13 @@ export const createVaultOperations = (options: VaultOperationsOptions): VaultOpe
           to,
           updateReferences
         });
+        options.remapNavigationHistory(result.mappings);
         options.setMarks(
           (marks) => new Set([...marks].filter((mark) => mark !== row.relPath).concat(to))
         );
         await options.refreshVault();
         if (row.kind === 'note' && options.selectedRelPath() === row.relPath)
-          await options.selectNote(to);
+          await options.selectNote(to, 'replace');
         options.reportWarnings(result.warnings);
       } catch (error) {
         options.reportError(error);
@@ -198,6 +204,7 @@ export const createVaultOperations = (options: VaultOperationsOptions): VaultOpe
           destinationDirectory,
           updateReferences
         });
+        options.remapNavigationHistory(result.mappings);
         options.setMarks(new Set<string>());
         await options.refreshVault();
         const selected = options.selectedRelPath();
@@ -206,7 +213,7 @@ export const createVaultOperations = (options: VaultOperationsOptions): VaultOpe
         );
         if (mapping) {
           const mapped = `${mapping.to}${selected.slice(mapping.from.length)}`;
-          if (mapped.endsWith('.typ')) await options.selectNote(mapped);
+          if (mapped.endsWith('.typ')) await options.selectNote(mapped, 'replace');
         }
         options.reportWarnings(result.warnings);
       } catch (error) {

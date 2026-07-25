@@ -1,6 +1,8 @@
 import type { ContextStack } from './context-stack';
 
 export interface DocumentView {
+  historyBack(): void;
+  historyForward(): void;
   scrollByLines(n: number): void;
   scrollByViewport(fraction: number): void;
   scrollToStart(): void;

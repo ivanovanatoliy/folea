@@ -1,6 +1,17 @@
 import { registerCommand } from '../commands';
 
 registerCommand({
+  id: 'document.historyBack',
+  title: 'Navigate back',
+  run: (ctx) => ctx.document.historyBack()
+});
+registerCommand({
+  id: 'document.historyForward',
+  title: 'Navigate forward',
+  run: (ctx) => ctx.document.historyForward()
+});
+
+registerCommand({
   id: 'zoom.fitWidth',
   exposure: 'action',
   title: 'Fit document width',

@@ -74,6 +74,7 @@ import {
 } from '../../shared/keys-config';
 import { dispatchSmartJump } from '../nav';
 import type { LinkGraph, NoteRef } from '../nav/link-graph';
+import { createNavigationHistory, type NavigationLocation } from '../nav/navigation-history';
 import { createLinkController } from '../features/links/create-link-controller';
 import type { LinkController } from '../features/links/create-link-controller';
 import {
@@ -87,6 +88,7 @@ import {
   createSurface,
   type SurfaceCacheWriteDetail,
   type SurfaceController,
+  type SurfaceErrorDetail,
   type SurfaceLinkClickDetail,
   type SurfacePageStatusDetail,
   type SurfaceRenderedDetail,
@@ -229,6 +231,7 @@ export const AppRuntime = () => {
   const [templateContextMenuOpen, setTemplateContextMenuOpen] = createSignal(false);
 
   const vaultIndex = new VaultIndex();
+  const navigationHistory = createNavigationHistory();
   let surfaceMount: HTMLDivElement | undefined;
   let surface: SurfaceController | undefined;
   let caretEngine: CaretEngine | undefined;
@@ -240,6 +243,8 @@ export const AppRuntime = () => {
   let pendingSearchTarget: (SurfaceSearchTarget & { readonly relPath: string }) | undefined;
   let pendingPositionRestore: NotePositionState | undefined;
   let pendingZoomRestore: { readonly relPath: string; readonly state: ZoomState } | undefined;
+  let historyNavigationInFlight = false;
+  let pendingHistoryRestoreRelPath: string | undefined;
 
   // Action refs — set inside onMount, consumed by JSX click handlers
   let paletteAcceptRow: (index: number) => void = () => {};
@@ -395,8 +400,62 @@ export const AppRuntime = () => {
   const persistRenderCache = noteController.persistRenderCache;
   const openNoteWithState = noteController.openWithState;
   const renderSelectedNote = noteController.renderSelected;
-  const selectNote = noteController.select;
+  const selectNoteDirect = noteController.select;
   const schedulePrefetch = noteController.schedulePrefetch;
+
+  type NavigationIntent = 'record' | 'replace';
+
+  const applyNavigationLocation = (location: NavigationLocation): void => {
+    surface?.setZoomState({ mode: location.zoomMode, level: location.zoomLevel });
+    restorePosition(location);
+    caretEngine?.restoreSpanIndex(location.caretSpanIndex);
+  };
+
+  const navigateToNote = async (
+    relPath: string,
+    intent: NavigationIntent = 'record',
+    recordSameNote = false
+  ): Promise<void> => {
+    if (!notes().some((note) => note.relPath === relPath)) return;
+    const current = noteController.capturePosition();
+    if (intent === 'record' && current && (recordSameNote || current.relPath !== relPath)) {
+      navigationHistory.record(current);
+    }
+    historyNavigationInFlight = false;
+    pendingHistoryRestoreRelPath = undefined;
+    await selectNoteDirect(relPath);
+  };
+
+  const recordInDocumentJump = (): void => {
+    const current = noteController.capturePosition();
+    if (current) navigationHistory.record(current);
+  };
+
+  const navigateHistory = async (direction: 'back' | 'forward'): Promise<void> => {
+    if (historyNavigationInFlight) return;
+    const current = noteController.capturePosition();
+    if (!current) return;
+    const available = new Set(notes().map((note) => note.relPath));
+    const target =
+      direction === 'back'
+        ? navigationHistory.back(current, (relPath) => available.has(relPath))
+        : navigationHistory.forward(current, (relPath) => available.has(relPath));
+    if (!target) return;
+
+    if (target.relPath === current.relPath) {
+      applyNavigationLocation(target);
+      return;
+    }
+
+    historyNavigationInFlight = true;
+    pendingHistoryRestoreRelPath = target.relPath;
+    try {
+      await selectNoteDirect(target.relPath, target);
+    } catch {
+      historyNavigationInFlight = false;
+      pendingHistoryRestoreRelPath = undefined;
+    }
+  };
 
   const disposeSurface = (): void => {
     surface?.dispose();
@@ -466,9 +525,7 @@ export const AppRuntime = () => {
       surfaceMount.scrollTop = Math.round(position.scrollRatio * currentMax);
     }
 
-    if (position.scrollLeft > 0) {
-      surfaceMount.scrollLeft = position.scrollLeft;
-    }
+    surfaceMount.scrollLeft = position.scrollLeft;
   };
 
   const openNote = (relPath: string, _currentNoteRelPath: string | undefined): void => {
@@ -476,7 +533,7 @@ export const AppRuntime = () => {
       label: 'note link',
       allowedSuffixes: ['.typ']
     });
-    void selectNote(safeRelPath);
+    void navigateToNote(safeRelPath);
   };
 
   const resolveNoteHrefAgainstVault = (rawHref: string, fromRelPath: string): string | null =>
@@ -488,6 +545,7 @@ export const AppRuntime = () => {
     const element = document.getElementById(id);
     if (!element || !surfaceMount.contains(element)) return;
 
+    recordInDocumentJump();
     const containerRect = surfaceMount.getBoundingClientRect();
     const rect = element.getBoundingClientRect();
     surface?.scrollToOffset(rect.top - containerRect.top + surfaceMount.scrollTop);
@@ -559,6 +617,7 @@ export const AppRuntime = () => {
       }
 
       const noteSet = new Set(listedNotes.map((n) => n.relPath));
+      navigationHistory.prune(noteSet);
       const missingPaths = [...vs.recentNotes.map((n) => n.relPath), vs.lastOpenedNote].filter(
         (rp): rp is string => rp !== null && !noteSet.has(rp)
       );
@@ -708,7 +767,8 @@ export const AppRuntime = () => {
     requestText,
     requestConfirmation,
     refreshVault,
-    selectNote,
+    selectNote: navigateToNote,
+    remapNavigationHistory: (mappings) => navigationHistory.remap(mappings),
     openTemplateManager: openTemplateManagerContext,
     reportError: reportOperationError,
     reportWarnings: reportOperationWarnings,
@@ -732,6 +792,9 @@ export const AppRuntime = () => {
     clearQuickOpenSearchTimer();
     await flushPosition();
     noteController.reset();
+    navigationHistory.clear();
+    historyNavigationInFlight = false;
+    pendingHistoryRestoreRelPath = undefined;
 
     try {
       await window.folea.vault.close();
@@ -772,6 +835,7 @@ export const AppRuntime = () => {
       } else {
         await window.folea.vault.open();
       }
+      navigationHistory.clear();
       const [appState, vs, loadedPrefs] = await Promise.all([
         window.folea.appState.load(),
         window.folea.vaultState.load(),
@@ -803,6 +867,7 @@ export const AppRuntime = () => {
       if (appState.lastOpenedVaultPath) {
         const handle = await window.folea.vault.openLast();
         if (handle) {
+          navigationHistory.clear();
           const [vs, loadedPrefs] = await Promise.all([
             window.folea.vaultState.load(),
             window.folea.prefs.load()
@@ -881,6 +946,20 @@ export const AppRuntime = () => {
     void loadKeyConfig();
 
     const documentView: DocumentView = {
+      historyBack: () => {
+        if (contextStack.active()?.name === 'visual') {
+          caretEngine?.exitVisual();
+          popContext('visual');
+        }
+        void navigateHistory('back');
+      },
+      historyForward: () => {
+        if (contextStack.active()?.name === 'visual') {
+          caretEngine?.exitVisual();
+          popContext('visual');
+        }
+        void navigateHistory('forward');
+      },
       scrollByLines: (n) => {
         surface?.scrollByLines(n);
         savePositionNow();
@@ -1040,7 +1119,7 @@ export const AppRuntime = () => {
         popContext('tree');
         popContext('tree-search');
         setTreeSearchQuery('');
-        void selectNote(row.relPath);
+        void navigateToNote(row.relPath);
       },
       toggleOverlay: () => {
         if (startupState() !== 'vault-open') return;
@@ -1131,6 +1210,7 @@ export const AppRuntime = () => {
         const entry = outlineEntries()[index ?? outlineSelectedIndex()];
         popContext('outline');
         if (entry) {
+          recordInDocumentJump();
           surface?.scrollToOffset(entry.position.y);
         }
       }
@@ -1201,7 +1281,7 @@ export const AppRuntime = () => {
                 .map((candidate) => candidate.line)
             ).size
           };
-          void selectNote(hit.relPath);
+          void navigateToNote(hit.relPath, 'record', true);
         }
       },
       setQuery: (query) => {
@@ -1241,13 +1321,13 @@ export const AppRuntime = () => {
           const entry = recentNotes()[idx];
           if (entry) {
             quickOpenView.close();
-            void selectNote(entry.relPath);
+            void navigateToNote(entry.relPath);
           }
         } else {
           const hit = quickOpenHits()[idx];
           if (hit) {
             quickOpenView.close();
-            void selectNote(hit.relPath);
+            void navigateToNote(hit.relPath);
           }
         }
       },
@@ -1462,7 +1542,7 @@ export const AppRuntime = () => {
         const selected = allRefs[index ?? linksSelectedIndex()];
         popContext('links');
         if (selected) {
-          void selectNote(selected.relPath);
+          void navigateToNote(selected.relPath);
         }
       }
     };
@@ -1518,7 +1598,7 @@ export const AppRuntime = () => {
         return;
       }
 
-      void selectNote(row.relPath);
+      void navigateToNote(row.relPath);
     };
     treeCloseRequest = () => treeView.close();
     treeCollapseAllRequest = () => treeView.collapseAll();
@@ -1541,7 +1621,7 @@ export const AppRuntime = () => {
       if (action === 'create-note') void createNoteFlow(row ? creationDirectory(row) : '');
       else if (action === 'create-directory')
         void createDirectoryFlow(row ? creationDirectory(row) : '');
-      else if (action === 'open' && row?.kind === 'note') void selectNote(row.relPath);
+      else if (action === 'open' && row?.kind === 'note') void navigateToNote(row.relPath);
       else if (action === 'open' && row?.kind === 'folder') toggleFolder(row.relPath);
       else if (action === 'editor' && row?.kind === 'note')
         void window.folea.editor.open(row.relPath);
@@ -1647,12 +1727,24 @@ export const AppRuntime = () => {
         const pos = pendingPositionRestore;
         pendingPositionRestore = undefined;
         restorePosition(pos);
+        caretEngine?.restoreSpanIndex(pos.caretSpanIndex);
       }
 
       if (pendingSearchTarget && pendingSearchTarget.relPath === detail.noteId) {
         surface?.revealSearchTarget(pendingSearchTarget);
         pendingSearchTarget = undefined;
       }
+
+      if (pendingHistoryRestoreRelPath === detail.noteId) {
+        pendingHistoryRestoreRelPath = undefined;
+        historyNavigationInFlight = false;
+      }
+    };
+    const surfaceErrorListener = (event: Event): void => {
+      const detail = (event as CustomEvent<SurfaceErrorDetail>).detail;
+      if (pendingHistoryRestoreRelPath !== detail.noteId) return;
+      pendingHistoryRestoreRelPath = undefined;
+      historyNavigationInFlight = false;
     };
     const linkClickListener = (event: Event): void => {
       const { target } = (event as CustomEvent<SurfaceLinkClickDetail>).detail;
@@ -1677,6 +1769,7 @@ export const AppRuntime = () => {
     window.addEventListener('folea:vault-refresh', refreshListener);
     window.addEventListener('folea:surface-page-status', pageStatusListener);
     window.addEventListener('folea:surface-rendered', surfaceRenderedListener);
+    window.addEventListener('folea:surface-error', surfaceErrorListener);
     window.addEventListener('folea:surface-link-click', linkClickListener);
     window.addEventListener('folea:surface-cache-write', surfaceCacheWriteListener);
     window.addEventListener('pagehide', disposeSurface);
@@ -1700,6 +1793,7 @@ export const AppRuntime = () => {
       window.removeEventListener('folea:vault-refresh', refreshListener);
       window.removeEventListener('folea:surface-page-status', pageStatusListener);
       window.removeEventListener('folea:surface-rendered', surfaceRenderedListener);
+      window.removeEventListener('folea:surface-error', surfaceErrorListener);
       window.removeEventListener('folea:surface-link-click', linkClickListener);
       window.removeEventListener('folea:surface-cache-write', surfaceCacheWriteListener);
       window.removeEventListener('pagehide', disposeSurface);

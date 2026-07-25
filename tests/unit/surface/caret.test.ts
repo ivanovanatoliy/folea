@@ -238,4 +238,29 @@ describe('caret overlay positioning', () => {
     expect(caret?.style.top).toBe('33px');
     expect(caret?.style.left).toBe('10px');
   });
+
+  it('captures and restores the caret span for navigation history', () => {
+    const { engine, container } = buildEnvironment({
+      containerRect: makeRect(0, 0, 200, 100),
+      documentRect: makeRect(10, 10, 180, 100),
+      tselRects: [makeRect(20, 18, 20, 10), makeRect(20, 43, 20, 10), makeRect(20, 68, 20, 10)]
+    });
+
+    engine.setTextLayer(
+      makeModel([
+        { text: 'one', top: 18 },
+        { text: 'two', top: 43 },
+        { text: 'three', top: 68 }
+      ]),
+      container as unknown as HTMLElement
+    );
+    engine.enable();
+
+    expect(engine.getSpanIndex()).toBe(1);
+    engine.restoreSpanIndex(2);
+    expect(engine.getSpanIndex()).toBe(2);
+
+    engine.disable();
+    expect(engine.getSpanIndex()).toBeNull();
+  });
 });

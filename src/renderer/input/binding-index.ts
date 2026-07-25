@@ -8,6 +8,7 @@ const CHORD_LABELS: Record<string, string> = {
   Enter: '↵',
   Space: 'Space',
   '<S-Space>': 'Shift+Space',
+  '<S-Backspace>': 'Shift+Backspace',
   ArrowUp: '↑',
   ArrowDown: '↓',
   ArrowLeft: '←',

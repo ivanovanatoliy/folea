@@ -111,6 +111,12 @@ export const isValidChord = (chord: string): boolean => {
       continue;
     }
 
+    if (rest.startsWith('<S-Backspace>')) {
+      index += '<S-Backspace>'.length;
+      tokenCount++;
+      continue;
+    }
+
     if (rest.startsWith('<C-')) {
       const close = rest.indexOf('>');
       if (close < 0) return false;
