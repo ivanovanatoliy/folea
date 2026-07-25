@@ -463,6 +463,21 @@ describe('chord normalization', () => {
     ).toBe('<S-Backspace>');
   });
 
+  it('normalizes Tab and Shift+Tab as distinct named chords', () => {
+    expect(normalizeChord({ key: 'Tab', ctrlKey: false, altKey: false, metaKey: false })).toBe(
+      'Tab'
+    );
+    expect(
+      normalizeChord({
+        key: 'Tab',
+        ctrlKey: false,
+        altKey: false,
+        metaKey: false,
+        shiftKey: true
+      })
+    ).toBe('<S-Tab>');
+  });
+
   it('modifier-only event returns null', () => {
     expect(
       normalizeChord({ key: 'Control', ctrlKey: true, altKey: false, metaKey: false })

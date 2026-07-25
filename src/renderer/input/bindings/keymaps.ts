@@ -90,6 +90,18 @@ export const VAULT_DIALOG_KEYMAP: Keymap = new Map([
   ['/', 'vaultDialog.ignore']
 ]);
 
+export const HELP_KEYMAP: Keymap = new Map([
+  ['Escape', 'help.close'],
+  ['Tab', 'help.nextTab'],
+  ['<S-Tab>', 'help.previousTab'],
+  ['ArrowRight', 'help.nextTab'],
+  ['ArrowLeft', 'help.previousTab'],
+  ['ArrowDown', 'help.scrollDown'],
+  ['j', 'help.scrollDown'],
+  ['ArrowUp', 'help.scrollUp'],
+  ['k', 'help.scrollUp']
+]);
+
 export const PALETTE_KEYMAP: Keymap = new Map([
   ['Escape', 'palette.close'],
   ['Enter', 'palette.accept'],
@@ -197,5 +209,6 @@ export const GLOBAL_KEYMAP: Keymap = new Map([
   [':', 'palette.open'],
   ['/', 'search.open'],
   ['<C-p>', 'document.quickOpen'],
-  ['<C-n>', 'tree.createNoteAtCurrent']
+  ['<C-n>', 'tree.createNoteAtCurrent'],
+  ['?', 'app.showKeyboardHelp']
 ]);

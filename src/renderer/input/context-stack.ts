@@ -12,7 +12,8 @@ export type InputContextName =
   | 'links'
   | 'quick-open'
   | 'templates'
-  | 'vault-dialog';
+  | 'vault-dialog'
+  | 'help';
 
 export interface ContextEntry {
   readonly name: InputContextName;

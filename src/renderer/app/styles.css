@@ -2,6 +2,7 @@
 @import './styles/base.css';
 @import './styles/surface.css';
 @import './styles/overlays.css';
+@import './styles/help.css';
 @import './styles/tree.css';
 @import './styles/dialogs.css';
 @import './styles/statusline.css';

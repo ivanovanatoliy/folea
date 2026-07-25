@@ -137,21 +137,25 @@ registerCommand({
 registerCommand({
   id: 'vaultDialog.cancel',
   exposure: 'internal',
+  title: 'Cancel dialog',
   run: (ctx) => ctx.vaultDialog?.cancel()
 });
 registerCommand({
   id: 'vaultDialog.submit',
   exposure: 'internal',
+  title: 'Confirm dialog',
   run: (ctx) => ctx.vaultDialog?.submit()
 });
 registerCommand({
   id: 'vaultDialog.next',
   exposure: 'internal',
+  title: 'Select next dialog option',
   run: (ctx) => ctx.vaultDialog?.next()
 });
 registerCommand({
   id: 'vaultDialog.previous',
   exposure: 'internal',
+  title: 'Select previous dialog option',
   run: (ctx) => ctx.vaultDialog?.previous()
 });
 registerCommand({

@@ -154,6 +154,15 @@ export interface CacheView {
   clearApplication(): Promise<void>;
 }
 
+export interface HelpView {
+  toggle(): void;
+  close(): void;
+  nextTab(): void;
+  previousTab(): void;
+  scrollDown(): void;
+  scrollUp(): void;
+}
+
 export interface CommandContext {
   readonly document: DocumentView;
   readonly contexts: ContextStack;
@@ -161,6 +170,7 @@ export interface CommandContext {
   readonly editor: EditorView;
   readonly theme: ThemeView;
   readonly cache: CacheView;
+  readonly help?: HelpView;
   readonly zoom: ZoomView;
   readonly outline: OutlineView;
   readonly links: LinksView;

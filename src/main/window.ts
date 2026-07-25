@@ -110,7 +110,7 @@ export const createMainWindow = (): BrowserWindow => {
   const mainWindow = new BrowserWindow({
     width: 1100,
     height: 760,
-    minWidth: 640,
+    minWidth: 360,
     minHeight: 420,
     show: false,
     autoHideMenuBar: true,

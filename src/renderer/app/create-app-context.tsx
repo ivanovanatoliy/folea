@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from 'solid-js';
 
 import { LinksOverlay } from './LinksOverlay';
+import { KeyboardHelpOverlay } from './KeyboardHelpOverlay';
 import { Logo } from './Logo';
 import { OutlineOverlay } from './OutlineOverlay';
 import { Notification, type NotificationValue } from './Notification';
@@ -11,6 +12,7 @@ import { filterPaletteCommands } from './palette-model';
 import { SearchOverlay } from './SearchOverlay';
 import { TreeOverlay } from './TreeOverlay';
 import { TemplateManagerOverlay } from './TemplateManagerOverlay';
+import { buildHelpCatalog, HELP_TAB_ORDER, helpTabForContext, type HelpTabId } from './help-model';
 import {
   buildTree,
   clampTreeIndex,
@@ -38,6 +40,7 @@ import {
   CARET_KEYMAP,
   DOCUMENT_KEYMAP,
   GLOBAL_KEYMAP,
+  HELP_KEYMAP,
   LINKS_KEYMAP,
   OUTLINE_KEYMAP,
   PALETTE_KEYMAP,
@@ -55,6 +58,7 @@ import type {
   CommandContext,
   DocumentView,
   EditorView,
+  HelpView,
   InputContextName,
   LinksView,
   OutlineView,
@@ -219,6 +223,10 @@ export const AppRuntime = () => {
   const [systemTheme, setSystemTheme] = createSignal<ResolvedTheme>('light');
   const [configWarnings, setConfigWarnings] = createSignal<readonly string[]>([]);
   const [bindingIndex, setBindingIndex] = createSignal<BindingIndex>(new Map());
+  const [helpCatalog, setHelpCatalog] = createSignal(buildHelpCatalog(cloneDefaultKeymaps()));
+  const [helpSelectedTab, setHelpSelectedTab] = createSignal<HelpTabId>('reading');
+  const [keyboardHelpSeen, setKeyboardHelpSeen] = createSignal(false);
+  const [keyConfigReady, setKeyConfigReady] = createSignal(false);
   const [recentVaults, setRecentVaults] = createSignal<readonly string[]>([]);
   const [treeSearchQuery, setTreeSearchQuery] = createSignal('');
   const [lastCreationTemplate, setLastCreationTemplate] = createSignal<string | null>(null);
@@ -245,6 +253,7 @@ export const AppRuntime = () => {
   let pendingZoomRestore: { readonly relPath: string; readonly state: ZoomState } | undefined;
   let historyNavigationInFlight = false;
   let pendingHistoryRestoreRelPath: string | undefined;
+  let firstRunHelpPending = false;
 
   // Action refs — set inside onMount, consumed by JSX click handlers
   let paletteAcceptRow: (index: number) => void = () => {};
@@ -272,6 +281,9 @@ export const AppRuntime = () => {
   let resolveVaultDialog: ((value: string | null | boolean | undefined) => void) | undefined;
   let openVaultDialogContext: () => void = () => {};
   let closeVaultDialogContext: () => void = () => {};
+  let maybeOpenFirstRunHelp: () => void = () => {};
+  let selectHelpTab: (tab: HelpTabId) => void = setHelpSelectedTab;
+  let scrollKeyboardHelp: (direction: -1 | 1) => void = () => {};
   let dismissTreeContextMenu: () => void = () => {};
   let dismissTemplateContextMenu: () => void = () => {};
   let vaultDialogActions: VaultOperationDialogActions = {
@@ -312,6 +324,7 @@ export const AppRuntime = () => {
   const searchVisible = createMemo(() => activeContext() === 'search');
   const outlineVisible = createMemo(() => activeContext() === 'outline');
   const linksVisible = createMemo(() => activeContext() === 'links');
+  const keyboardHelpVisible = createMemo(() => activeContext() === 'help');
   const treeOverlayVisible = createMemo(
     () =>
       activeContext() === 'tree' ||
@@ -842,9 +855,12 @@ export const AppRuntime = () => {
         window.folea.prefs.load()
       ]);
       setRecentVaults(appState.recentVaults);
+      setKeyboardHelpSeen((seen) => seen || appState.hasSeenKeyboardHelp);
       applyLoadedPrefs(loadedPrefs);
       setStartupState('vault-open');
       await refreshVault(vs);
+      firstRunHelpPending = true;
+      maybeOpenFirstRunHelp();
     } catch {
       // user cancelled or vault open failed
     }
@@ -863,6 +879,7 @@ export const AppRuntime = () => {
     try {
       const appState = await window.folea.appState.load();
       setRecentVaults(appState.recentVaults);
+      setKeyboardHelpSeen((seen) => seen || appState.hasSeenKeyboardHelp);
 
       if (appState.lastOpenedVaultPath) {
         const handle = await window.folea.vault.openLast();
@@ -875,6 +892,8 @@ export const AppRuntime = () => {
           applyLoadedPrefs(loadedPrefs);
           setStartupState('vault-open');
           await refreshVault(vs);
+          firstRunHelpPending = true;
+          maybeOpenFirstRunHelp();
           return;
         }
       }
@@ -922,6 +941,69 @@ export const AppRuntime = () => {
     };
 
     const keymaps = cloneDefaultKeymaps();
+    setHelpCatalog(buildHelpCatalog(keymaps));
+
+    const closeKeyboardHelp = (): void => {
+      popContext('help');
+    };
+
+    const markKeyboardHelpSeen = (): void => {
+      if (keyboardHelpSeen()) return;
+      setKeyboardHelpSeen(true);
+      void window.folea.appState
+        .markKeyboardHelpSeen()
+        .then((state) => setRecentVaults(state.recentVaults))
+        .catch(() => {});
+    };
+
+    const openKeyboardHelp = (): void => {
+      const source = contextStack.active()?.name ?? 'document';
+      if (source === 'help') {
+        closeKeyboardHelp();
+        return;
+      }
+
+      setHelpSelectedTab(helpTabForContext(source));
+      const helpKeymap = new Map(
+        [...keymaps.global]
+          .filter(([, commandId]) => commandId !== 'app.showKeyboardHelp')
+          .map(([chord]) => [chord, 'help.ignore'])
+      );
+      for (const [chord, commandId] of HELP_KEYMAP) helpKeymap.set(chord, commandId);
+      pushContext('help', helpKeymap);
+      markKeyboardHelpSeen();
+    };
+
+    const moveHelpTab = (offset: number): void => {
+      setHelpSelectedTab((current) => {
+        const index = HELP_TAB_ORDER.indexOf(current);
+        return HELP_TAB_ORDER[(index + offset + HELP_TAB_ORDER.length) % HELP_TAB_ORDER.length]!;
+      });
+    };
+
+    const helpView: HelpView = {
+      toggle: openKeyboardHelp,
+      close: closeKeyboardHelp,
+      nextTab: () => moveHelpTab(1),
+      previousTab: () => moveHelpTab(-1),
+      scrollDown: () => scrollKeyboardHelp(1),
+      scrollUp: () => scrollKeyboardHelp(-1)
+    };
+
+    selectHelpTab = setHelpSelectedTab;
+    maybeOpenFirstRunHelp = () => {
+      if (
+        !firstRunHelpPending ||
+        !keyConfigReady() ||
+        keyboardHelpSeen() ||
+        startupState() !== 'vault-open'
+      ) {
+        return;
+      }
+
+      firstRunHelpPending = false;
+      openKeyboardHelp();
+    };
 
     const loadKeyConfig = async (): Promise<void> => {
       try {
@@ -937,6 +1019,10 @@ export const AppRuntime = () => {
         setConfigWarnings((current) => [...current, ...applied.warnings]);
       } catch {
         setConfigWarnings((current) => [...current, 'keys.config: unable to load, using defaults']);
+      } finally {
+        setHelpCatalog(buildHelpCatalog(keymaps));
+        setKeyConfigReady(true);
+        maybeOpenFirstRunHelp();
       }
     };
 
@@ -1571,6 +1657,7 @@ export const AppRuntime = () => {
       editor: editorView,
       theme: themeView,
       cache: cacheView,
+      help: helpView,
       zoom: zoomView,
       outline: outlineView,
       links: linksView,
@@ -1996,6 +2083,15 @@ export const AppRuntime = () => {
           }}
         />
         <Notification value={notification()} onExpire={() => setNotification(undefined)} />
+        <KeyboardHelpOverlay
+          visible={keyboardHelpVisible()}
+          catalog={helpCatalog()}
+          selectedTab={helpSelectedTab()}
+          onSelectTab={(tab) => selectHelpTab(tab)}
+          registerScroll={(scroll) => {
+            scrollKeyboardHelp = scroll;
+          }}
+        />
         <PaletteOverlay
           visible={paletteVisible()}
           modeLabel="palette"

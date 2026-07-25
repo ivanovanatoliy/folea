@@ -9,6 +9,7 @@ const CHORD_LABELS: Record<string, string> = {
   Space: 'Space',
   '<S-Space>': 'Shift+Space',
   '<S-Backspace>': 'Shift+Backspace',
+  '<S-Tab>': 'Shift+Tab',
   ArrowUp: '↑',
   ArrowDown: '↓',
   ArrowLeft: '←',
@@ -21,7 +22,7 @@ const CHORD_LABELS: Record<string, string> = {
   '<C-e>': 'C-e'
 };
 
-const formatChord = (chord: string): string => {
+export const formatChord = (chord: string): string => {
   const ctrl = /^<C-([a-z0-9])>$/.exec(chord);
   if (ctrl) {
     return `C-${ctrl[1]}`;

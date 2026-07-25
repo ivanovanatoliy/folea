@@ -7,7 +7,9 @@ import {
 } from '../shared/ipc/app';
 import {
   APP_STATE_LOAD_CHANNEL,
+  APP_STATE_MARK_KEYBOARD_HELP_SEEN_CHANNEL,
   APP_STATE_REMOVE_RECENT_CHANNEL,
+  parseMarkKeyboardHelpSeenRequest,
   parseAppStateFileV1,
   parseRemoveRecentVaultRequest,
   type AppStateFileV1
@@ -150,6 +152,14 @@ const bridge: FoleaBridge = Object.freeze({
     removeRecentVault: async (rootPath: string): Promise<AppStateFileV1> => {
       const validated = parseRemoveRecentVaultRequest({ type: 'removeRecentVault', rootPath });
       const response = await ipcRenderer.invoke(APP_STATE_REMOVE_RECENT_CHANNEL, validated);
+      return parseAppStateFileV1(response);
+    },
+    markKeyboardHelpSeen: async (): Promise<AppStateFileV1> => {
+      const validated = parseMarkKeyboardHelpSeenRequest({ type: 'markKeyboardHelpSeen' });
+      const response = await ipcRenderer.invoke(
+        APP_STATE_MARK_KEYBOARD_HELP_SEEN_CHANNEL,
+        validated
+      );
       return parseAppStateFileV1(response);
     }
   }),

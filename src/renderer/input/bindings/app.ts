@@ -1,6 +1,54 @@
 import { registerCommand } from '../commands';
 
 registerCommand({
+  id: 'app.showKeyboardHelp',
+  exposure: 'action',
+  title: 'Show keyboard help',
+  run: (ctx) => ctx.help?.toggle()
+});
+
+registerCommand({
+  id: 'help.close',
+  exposure: 'internal',
+  title: 'Close keyboard help',
+  run: (ctx) => ctx.help?.close()
+});
+
+registerCommand({
+  id: 'help.nextTab',
+  exposure: 'internal',
+  title: 'Next keyboard help tab',
+  run: (ctx) => ctx.help?.nextTab()
+});
+
+registerCommand({
+  id: 'help.previousTab',
+  exposure: 'internal',
+  title: 'Previous keyboard help tab',
+  run: (ctx) => ctx.help?.previousTab()
+});
+
+registerCommand({
+  id: 'help.scrollDown',
+  exposure: 'internal',
+  title: 'Scroll keyboard help down',
+  run: (ctx) => ctx.help?.scrollDown()
+});
+
+registerCommand({
+  id: 'help.scrollUp',
+  exposure: 'internal',
+  title: 'Scroll keyboard help up',
+  run: (ctx) => ctx.help?.scrollUp()
+});
+
+registerCommand({
+  id: 'help.ignore',
+  exposure: 'internal',
+  run: () => {}
+});
+
+registerCommand({
   id: 'cache.clearApplication',
   exposure: 'action',
   title: 'Clear application cache',

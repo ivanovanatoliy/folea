@@ -109,5 +109,9 @@ export const normalizeChord = (event: KeyEvent): string | null => {
     return '<S-Backspace>';
   }
 
+  if (key === 'Tab' && event.shiftKey === true) {
+    return '<S-Tab>';
+  }
+
   return key;
 };

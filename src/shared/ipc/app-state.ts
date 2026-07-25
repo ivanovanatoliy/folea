@@ -1,5 +1,7 @@
 export const APP_STATE_LOAD_CHANNEL = 'folea:appState:load' as const;
 export const APP_STATE_REMOVE_RECENT_CHANNEL = 'folea:appState:removeRecent' as const;
+export const APP_STATE_MARK_KEYBOARD_HELP_SEEN_CHANNEL =
+  'folea:appState:markKeyboardHelpSeen' as const;
 
 export const RECENT_VAULTS_MAX = 10;
 
@@ -8,14 +10,17 @@ export interface AppStateFileV1 {
   readonly updatedAt: string;
   readonly lastOpenedVaultPath: string | null;
   readonly recentVaults: readonly string[];
+  readonly hasSeenKeyboardHelp: boolean;
 }
 
 export type AppStatePatch =
   | { readonly type: 'setLastOpenedVault'; readonly rootPath: string }
   | { readonly type: 'removeRecentVault'; readonly rootPath: string }
-  | { readonly type: 'clearInvalidLastOpenedVault' };
+  | { readonly type: 'clearInvalidLastOpenedVault' }
+  | { readonly type: 'markKeyboardHelpSeen' };
 
 export type RemoveRecentVaultRequest = Extract<AppStatePatch, { type: 'removeRecentVault' }>;
+export type MarkKeyboardHelpSeenRequest = Extract<AppStatePatch, { type: 'markKeyboardHelpSeen' }>;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -40,12 +45,17 @@ export const parseAppStateFileV1 = (value: unknown): AppStateFileV1 => {
   const recentVaults = Array.isArray(value.recentVaults)
     ? (value.recentVaults as unknown[]).filter((v): v is string => typeof v === 'string')
     : [];
+  const hasSeenKeyboardHelp =
+    typeof value.hasSeenKeyboardHelp === 'boolean'
+      ? value.hasSeenKeyboardHelp
+      : recentVaults.length > 0;
 
   return {
     schemaVersion: 1,
     updatedAt: value.updatedAt,
     lastOpenedVaultPath: value.lastOpenedVaultPath as string | null,
-    recentVaults
+    recentVaults,
+    hasSeenKeyboardHelp
   };
 };
 
@@ -79,6 +89,10 @@ export const parseAppStatePatch = (value: unknown): AppStatePatch => {
       return { type: 'clearInvalidLastOpenedVault' };
     }
 
+    case 'markKeyboardHelpSeen': {
+      return { type: 'markKeyboardHelpSeen' };
+    }
+
     default:
       throw new TypeError('Unknown app state patch type');
   }
@@ -92,9 +106,18 @@ export const parseRemoveRecentVaultRequest = (value: unknown): RemoveRecentVault
   return patch;
 };
 
+export const parseMarkKeyboardHelpSeenRequest = (value: unknown): MarkKeyboardHelpSeenRequest => {
+  const patch = parseAppStatePatch(value);
+  if (patch.type !== 'markKeyboardHelpSeen') {
+    throw new TypeError('Only keyboard help acknowledgement is available on this channel');
+  }
+  return patch;
+};
+
 export const defaultAppState = (): AppStateFileV1 => ({
   schemaVersion: 1,
   updatedAt: new Date().toISOString(),
   lastOpenedVaultPath: null,
-  recentVaults: []
+  recentVaults: [],
+  hasSeenKeyboardHelp: false
 });

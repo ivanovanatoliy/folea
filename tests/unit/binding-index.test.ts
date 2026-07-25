@@ -38,13 +38,15 @@ describe('buildBindingIndex', () => {
       ['Escape', 'palette.close'],
       ['Space', 'document.scrollHalfDown'],
       ['<S-Space>', 'document.scrollHalfUp'],
-      ['<S-Backspace>', 'document.historyForward']
+      ['<S-Backspace>', 'document.historyForward'],
+      ['<S-Tab>', 'help.previousTab']
     ]);
     const index = buildBindingIndex([keymap]);
     expect(index.get('palette.close')).toBe('Esc');
     expect(index.get('document.scrollHalfDown')).toBe('Space');
     expect(index.get('document.scrollHalfUp')).toBe('Shift+Space');
     expect(index.get('document.historyForward')).toBe('Shift+Backspace');
+    expect(index.get('help.previousTab')).toBe('Shift+Tab');
   });
 
   it('returns empty map for no keymaps', () => {

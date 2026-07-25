@@ -119,6 +119,10 @@ describe('keys.config parser', () => {
     );
   });
 
+  it('accepts Shift+Tab as a chord', () => {
+    expect(isValidChord('<S-Tab>')).toBe(true);
+  });
+
   it('accepts and applies Shift+Backspace in every default reading context', () => {
     expect(isValidChord('<S-Backspace>')).toBe(true);
     const parsed = parseKeysConfig('document.historyForward F8', known);

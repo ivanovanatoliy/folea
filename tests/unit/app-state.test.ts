@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   parseAppStateFileV1,
   parseAppStatePatch,
+  parseMarkKeyboardHelpSeenRequest,
   parseRemoveRecentVaultRequest,
   defaultAppState
 } from '../../src/shared/ipc/app-state';
@@ -17,6 +18,7 @@ describe('parseAppStateFileV1', () => {
     expect(result.schemaVersion).toBe(1);
     expect(result.lastOpenedVaultPath).toBeNull();
     expect(result.recentVaults).toEqual([]);
+    expect(result.hasSeenKeyboardHelp).toBe(false);
   });
 
   it('parses a valid state with a vault path and recentVaults', () => {
@@ -29,6 +31,7 @@ describe('parseAppStateFileV1', () => {
     const result = parseAppStateFileV1(input);
     expect(result.lastOpenedVaultPath).toBe('/home/user/vault');
     expect(result.recentVaults).toEqual(['/home/user/vault', '/home/user/other']);
+    expect(result.hasSeenKeyboardHelp).toBe(true);
   });
 
   it('defaults recentVaults to [] when missing (backward compat)', () => {
@@ -50,6 +53,18 @@ describe('parseAppStateFileV1', () => {
     };
     const result = parseAppStateFileV1(input);
     expect(result.recentVaults).toEqual(['/valid/path', '/another/path']);
+  });
+
+  it('preserves an explicit keyboard help acknowledgement value', () => {
+    const result = parseAppStateFileV1({
+      schemaVersion: 1,
+      updatedAt: '2026-01-01T00:00:00Z',
+      lastOpenedVaultPath: '/home/user/vault',
+      recentVaults: ['/home/user/vault'],
+      hasSeenKeyboardHelp: false
+    });
+
+    expect(result.hasSeenKeyboardHelp).toBe(false);
   });
 
   it('throws for wrong schema version', () => {
@@ -109,6 +124,12 @@ describe('parseAppStatePatch', () => {
     expect(patch).toEqual({ type: 'removeRecentVault', rootPath: '/home/user/vault' });
   });
 
+  it('parses keyboard help acknowledgement', () => {
+    expect(parseAppStatePatch({ type: 'markKeyboardHelpSeen' })).toEqual({
+      type: 'markKeyboardHelpSeen'
+    });
+  });
+
   it('throws for unknown patch type', () => {
     expect(() => parseAppStatePatch({ type: 'unknown' })).toThrow(TypeError);
   });
@@ -120,6 +141,7 @@ describe('defaultAppState', () => {
     expect(state.schemaVersion).toBe(1);
     expect(state.lastOpenedVaultPath).toBeNull();
     expect(state.recentVaults).toEqual([]);
+    expect(state.hasSeenKeyboardHelp).toBe(false);
   });
 });
 
@@ -128,6 +150,15 @@ describe('renderer app state boundary', () => {
     expect(
       parseRemoveRecentVaultRequest({ type: 'removeRecentVault', rootPath: '/vault' })
     ).toEqual({ type: 'removeRecentVault', rootPath: '/vault' });
+  });
+
+  it('allows acknowledging keyboard help on its dedicated channel', () => {
+    expect(parseMarkKeyboardHelpSeenRequest({ type: 'markKeyboardHelpSeen' })).toEqual({
+      type: 'markKeyboardHelpSeen'
+    });
+    expect(() =>
+      parseMarkKeyboardHelpSeenRequest({ type: 'removeRecentVault', rootPath: '/vault' })
+    ).toThrow('Only keyboard help acknowledgement');
   });
 
   it('rejects trusted main-process state mutations', () => {

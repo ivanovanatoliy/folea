@@ -65,7 +65,9 @@ import {
 import { validateShellOpenExternalRequest } from '../shared/ipc/shell';
 import {
   APP_STATE_LOAD_CHANNEL,
+  APP_STATE_MARK_KEYBOARD_HELP_SEEN_CHANNEL,
   APP_STATE_REMOVE_RECENT_CHANNEL,
+  parseMarkKeyboardHelpSeenRequest,
   parseRemoveRecentVaultRequest,
   parseAppStateFileV1
 } from '../shared/ipc/app-state';
@@ -204,6 +206,12 @@ export const registerIpcHandlers = (): void => {
   ipcMain.removeHandler(APP_STATE_REMOVE_RECENT_CHANNEL);
   ipcMain.handle(APP_STATE_REMOVE_RECENT_CHANNEL, async (_event, request: unknown) => {
     const patch = parseRemoveRecentVaultRequest(request);
+    return parseAppStateFileV1(await updateAppState(patch));
+  });
+
+  ipcMain.removeHandler(APP_STATE_MARK_KEYBOARD_HELP_SEEN_CHANNEL);
+  ipcMain.handle(APP_STATE_MARK_KEYBOARD_HELP_SEEN_CHANNEL, async (_event, request: unknown) => {
+    const patch = parseMarkKeyboardHelpSeenRequest(request);
     return parseAppStateFileV1(await updateAppState(patch));
   });
 

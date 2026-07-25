@@ -19,6 +19,7 @@ import type {
 export interface FoleaAppStateBridge {
   load(): Promise<AppStateFileV1>;
   removeRecentVault(rootPath: string): Promise<AppStateFileV1>;
+  markKeyboardHelpSeen(): Promise<AppStateFileV1>;
 }
 
 export interface FoleaVaultStateBridge {

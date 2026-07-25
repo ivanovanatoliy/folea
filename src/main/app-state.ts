@@ -52,7 +52,10 @@ export const loadAppState = async (): Promise<AppStateFileV1> => {
       }
     }
 
-    cached = defaultAppState();
+    cached = {
+      ...defaultAppState(),
+      hasSeenKeyboardHelp: process.env.FOLEA_TEST_SKIP_FIRST_RUN_HELP === '1'
+    };
     return cached;
   }
 };
@@ -94,6 +97,15 @@ export const updateAppState = async (patch: AppStatePatch): Promise<AppStateFile
           lastOpenedVaultPath:
             current.lastOpenedVaultPath === patch.rootPath ? null : current.lastOpenedVaultPath,
           recentVaults: current.recentVaults.filter((p) => p !== patch.rootPath)
+        };
+        break;
+      }
+
+      case 'markKeyboardHelpSeen': {
+        next = {
+          ...current,
+          updatedAt: new Date().toISOString(),
+          hasSeenKeyboardHelp: true
         };
         break;
       }

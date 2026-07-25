@@ -117,6 +117,12 @@ export const isValidChord = (chord: string): boolean => {
       continue;
     }
 
+    if (rest.startsWith('<S-Tab>')) {
+      index += '<S-Tab>'.length;
+      tokenCount++;
+      continue;
+    }
+
     if (rest.startsWith('<C-')) {
       const close = rest.indexOf('>');
       if (close < 0) return false;

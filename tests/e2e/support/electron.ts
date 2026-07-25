@@ -16,7 +16,11 @@ export const launchApp = async (
   if (activeApplication) throw new Error('An Electron test application is already running');
   activeApplication = await electron.launch({
     args: [process.cwd(), ...extraArgs],
-    env: { ...env, FOLEA_DISABLE_HARDWARE_ACCELERATION: '1' }
+    env: {
+      ...env,
+      FOLEA_DISABLE_HARDWARE_ACCELERATION: '1',
+      FOLEA_TEST_SKIP_FIRST_RUN_HELP: env.FOLEA_TEST_SKIP_FIRST_RUN_HELP ?? '1'
+    }
   });
   return activeApplication;
 };
