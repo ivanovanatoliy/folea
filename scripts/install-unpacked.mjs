@@ -122,8 +122,10 @@ const installWindows = async () => {
 
   const shortcutDir = path.join(appData, 'Microsoft', 'Windows', 'Start Menu', 'Programs');
   const shortcutPath = path.join(shortcutDir, 'folea.lnk');
+  const legacyShortcutPath = path.join(shortcutDir, 'Folea Dev.lnk');
   const exePath = path.join(target, 'folea.exe');
   await fs.mkdir(shortcutDir, { recursive: true });
+  await fs.rm(legacyShortcutPath, { force: true });
 
   const script = `
 $Shell = New-Object -ComObject WScript.Shell

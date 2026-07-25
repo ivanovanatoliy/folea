@@ -1,6 +1,6 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
-  <!-- Windows uses a near-edge optical fill instead of the macOS icon safe area. -->
-  <g transform="translate(512 512) scale(1.2) translate(-512 -512)">
+  <!-- Scale the complete plated icon so its taskbar silhouette matches Windows system apps. -->
+  <g transform="translate(512 512) scale(1.5) translate(-512 -512)">
     <rect x="100" y="100" width="824" height="824" rx="185" fill="#1b1b1f"></rect>
     <g transform="translate(512,733.06) scale(3.2974)">
       <path d="M0,0 C50,-26 34,-88 0,-118 C-34,-88 -50,-26 0,0 Z" fill="#3f9068" stroke="#1b1b1f" stroke-width="11" stroke-linejoin="round" transform="rotate(-62) scale(1.12,1)"></path>

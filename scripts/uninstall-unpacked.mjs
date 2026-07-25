@@ -54,9 +54,18 @@ const uninstallWindows = async () => {
     'Programs',
     'folea.lnk'
   );
+  const legacyShortcut = path.join(
+    appData,
+    'Microsoft',
+    'Windows',
+    'Start Menu',
+    'Programs',
+    'Folea Dev.lnk'
+  );
 
   await fs.rm(target, { recursive: true, force: true });
   await fs.rm(shortcut, { force: true });
+  await fs.rm(legacyShortcut, { force: true });
 
   console.log(`Removed local unpacked folea installation:
   shortcut: ${shortcut}

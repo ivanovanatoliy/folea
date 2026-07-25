@@ -20,6 +20,8 @@
       "$env:FOLEA_BUILD_TIMESTAMP = '__TIMESTAMP__'",
       "$env:FOLEA_SOURCE_BRANCH = 'develop'",
       "$env:FOLEA_WORKFLOW_RUN_URL = '__WORKFLOW_RUN_URL__'",
+      "$legacyStartMenu = if ($global) { [Environment]::GetFolderPath('CommonStartMenu') } else { [Environment]::GetFolderPath('StartMenu') }",
+      "Remove-Item -LiteralPath (Join-Path $legacyStartMenu 'Programs\\Scoop Apps\\Folea Dev.lnk') -Force -ErrorAction SilentlyContinue",
       "$builtVersion = node scripts/prepare-development-build.mjs",
       "if ($builtVersion -ne '__VERSION__') { throw \"Unexpected build version: $builtVersion\" }",
       "npm ci",
@@ -31,6 +33,10 @@
       "Get-ChildItem -LiteralPath $dir -Force | Where-Object Name -ne 'app' | Remove-Item -Recurse -Force"
     ]
   },
+  "pre_uninstall": [
+    "$legacyStartMenu = if ($global) { [Environment]::GetFolderPath('CommonStartMenu') } else { [Environment]::GetFolderPath('StartMenu') }",
+    "Remove-Item -LiteralPath (Join-Path $legacyStartMenu 'Programs\\Scoop Apps\\Folea Dev.lnk') -Force -ErrorAction SilentlyContinue"
+  ],
   "bin": [["app\\folea.exe", "folea"]],
   "shortcuts": [["app\\folea.exe", "folea"]]
 }

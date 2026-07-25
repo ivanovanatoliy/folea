@@ -1,5 +1,6 @@
 {
   "name": "folea",
+  "productName": "folea",
   "version": "0.0.0",
   "description": "Keyboard-driven, minimalist note manager for Typst notes",
   "homepage": "https://github.com/ivanovanatoliy/folea",
@@ -19,6 +20,7 @@
   "build": {
     "appId": "dev.folea.app",
     "productName": "folea",
+    "executableName": "folea",
     "copyright": "Copyright © 2026 folea contributors",
     "files": [
       "out/**",
@@ -49,6 +51,10 @@
         "nsis"
       ],
       "icon": "assets/logo/app-icon-windows.ico"
+    },
+    "nsis": {
+      "shortcutName": "folea",
+      "uninstallDisplayName": "folea"
     },
     "linux": {
       "target": [

@@ -21,7 +21,15 @@ it('renders lowercase installed Scoop names', () => {
   const manifest = JSON.parse(readFileSync(output, 'utf8')) as {
     bin: string[][];
     shortcuts: string[][];
+    installer: { script: string[] };
+    pre_uninstall: string[];
   };
   expect(manifest.bin).toEqual([['app\\folea.exe', 'folea']]);
   expect(manifest.shortcuts).toEqual([['app\\folea.exe', 'folea']]);
+  expect(manifest.installer.script).toContain(
+    "Remove-Item -LiteralPath (Join-Path $legacyStartMenu 'Programs\\Scoop Apps\\Folea Dev.lnk') -Force -ErrorAction SilentlyContinue"
+  );
+  expect(manifest.pre_uninstall).toContain(
+    "Remove-Item -LiteralPath (Join-Path $legacyStartMenu 'Programs\\Scoop Apps\\Folea Dev.lnk') -Force -ErrorAction SilentlyContinue"
+  );
 });

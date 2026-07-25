@@ -20,7 +20,13 @@ const paeth = (left: number, up: number, upperLeft: number): number => {
 const readRgbaPngAlphaBounds = (
   png: Buffer,
   alphaThreshold = 16
-): { left: number; top: number; right: number; bottom: number } => {
+): {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  opaqueCoverage: number;
+} => {
   expect(png.subarray(0, 8)).toEqual(pngSignature);
 
   let width = 0;
@@ -68,9 +74,12 @@ const readRgbaPngAlphaBounds = (
   let top = height;
   let right = 0;
   let bottom = 0;
+  let opaquePixels = 0;
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
-      if (pixels[y * stride + x * bytesPerPixel + 3]! < alphaThreshold) continue;
+      const alpha = pixels[y * stride + x * bytesPerPixel + 3]!;
+      if (alpha >= 240) opaquePixels += 1;
+      if (alpha < alphaThreshold) continue;
       left = Math.min(left, x);
       top = Math.min(top, y);
       right = Math.max(right, x + 1);
@@ -78,10 +87,44 @@ const readRgbaPngAlphaBounds = (
     }
   }
 
-  return { left, top, right, bottom };
+  return {
+    left,
+    top,
+    right,
+    bottom,
+    opaqueCoverage: opaquePixels / (width * height)
+  };
 };
 
 describe('package metadata', () => {
+  it('uses lowercase folea as the application name on every platform', () => {
+    const packageJson = JSON.parse(read('package.json')) as {
+      name: string;
+      productName: string;
+      desktopName: string;
+      build: {
+        productName: string;
+        executableName: string;
+        nsis: { shortcutName: string; uninstallDisplayName: string };
+      };
+    };
+
+    expect(packageJson.name).toBe('folea');
+    expect(packageJson.productName).toBe('folea');
+    expect(packageJson.desktopName).toBe('folea');
+    expect(packageJson.build.productName).toBe('folea');
+    expect(packageJson.build.executableName).toBe('folea');
+    expect(packageJson.build.nsis).toEqual({
+      shortcutName: 'folea',
+      uninstallDisplayName: 'folea'
+    });
+    expect(read('src/renderer/index.html')).toContain('<title>folea</title>');
+    expect(read('packaging/aur/folea.desktop')).toContain('\nName=folea\n');
+    expect(read('packaging/homebrew/Casks/folea-dev.rb.in')).toContain('name "folea"');
+    expect(read('scripts/install-unpacked.mjs')).toContain("'Folea Dev.lnk'");
+    expect(read('scripts/uninstall-unpacked.mjs')).toContain("'Folea Dev.lnk'");
+  });
+
   it('uses one package description everywhere', () => {
     const packageJson = JSON.parse(read('package.json')) as { description: string };
     expect(packageJson.description).toBe(description);
@@ -121,13 +164,14 @@ describe('package metadata', () => {
     expect(packageJson.build.files).toContain('assets/logo/app-icon-windows.ico');
     expect(packageJson.build.mac.icon).toBe('assets/logo/app-icon-dark.svg');
     expect(packageJson.build.linux.icon).toBe('assets/logo/app-icon-dark.svg');
-    expect(read('assets/logo/app-icon-windows.svg')).toContain('scale(1.2)');
+    expect(read('assets/logo/app-icon-windows.svg')).toContain('scale(1.5)');
 
     const ico = readFileSync(path.resolve('assets/logo/app-icon-windows.ico'));
     expect(ico.readUInt16LE(0)).toBe(0);
     expect(ico.readUInt16LE(2)).toBe(1);
     const count = ico.readUInt16LE(4);
     let largestPng: Buffer | undefined;
+    let taskbarPng: Buffer | undefined;
     const sizes = Array.from({ length: count }, (_, index) => {
       const offset = 6 + index * 16;
       const width = ico[offset] || 256;
@@ -138,6 +182,7 @@ describe('package metadata', () => {
       expect(ico.subarray(imageOffset, imageOffset + 8)).toEqual(pngSignature);
       expect(imageOffset + bytes).toBeLessThanOrEqual(ico.length);
       if (width === 256) largestPng = ico.subarray(imageOffset, imageOffset + bytes);
+      if (width === 24) taskbarPng = ico.subarray(imageOffset, imageOffset + bytes);
       return width;
     }).sort((a, b) => a - b);
 
@@ -147,6 +192,11 @@ describe('package metadata', () => {
     expect(
       Math.max(bounds.left, bounds.top, 256 - bounds.right, 256 - bounds.bottom)
     ).toBeLessThanOrEqual(5);
+
+    expect(taskbarPng).toBeDefined();
+    const taskbar = readRgbaPngAlphaBounds(taskbarPng!);
+    expect(taskbar).toMatchObject({ left: 0, top: 0, right: 24, bottom: 24 });
+    expect(taskbar.opaqueCoverage).toBeGreaterThanOrEqual(0.99);
   });
 });
 

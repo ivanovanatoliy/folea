@@ -235,6 +235,9 @@ jobs:
           git -C test-bucket commit -m 'Test manifest'
           $bucketUrl = "file:///$($PWD.Path.Replace('\', '/'))/test-bucket"
           scoop bucket add folea-test $bucketUrl
+          $legacyShortcut = Join-Path ([Environment]::GetFolderPath('StartMenu')) 'Programs\Scoop Apps\Folea Dev.lnk'
+          New-Item -ItemType Directory -Path (Split-Path $legacyShortcut) -Force | Out-Null
+          New-Item -ItemType File -Path $legacyShortcut -Force | Out-Null
           scoop install folea-test/folea-dev
           "$env:USERPROFILE\scoop\shims" | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: Verify Scoop install
@@ -244,6 +247,7 @@ jobs:
           if (!(Test-Path "$prefix\app\folea.exe")) { throw 'Executable is missing' }
           if (!(Get-Command folea -ErrorAction SilentlyContinue)) { throw 'Shim is missing' }
           if (!(Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu" -Recurse -Filter 'folea.lnk')) { throw 'Shortcut is missing' }
+          if (Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu" -Recurse -Filter 'Folea Dev.lnk') { throw 'Legacy shortcut is still installed' }
           if (!(Get-Content "$prefix\app\resources\build-info" | Select-String -SimpleMatch "SOURCE_COMMIT=$env:GITHUB_SHA")) { throw 'Commit metadata is wrong' }
           $process = Start-Process "$prefix\app\folea.exe" -PassThru
           Start-Sleep -Seconds 5
