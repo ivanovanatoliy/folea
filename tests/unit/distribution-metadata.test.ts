@@ -26,6 +26,8 @@ const readRgbaPngAlphaBounds = (
   right: number;
   bottom: number;
   opaqueCoverage: number;
+  cornerAlpha: number;
+  edgeCenterAlpha: number;
 } => {
   expect(png.subarray(0, 8)).toEqual(pngSignature);
 
@@ -92,7 +94,9 @@ const readRgbaPngAlphaBounds = (
     top,
     right,
     bottom,
-    opaqueCoverage: opaquePixels / (width * height)
+    opaqueCoverage: opaquePixels / (width * height),
+    cornerAlpha: pixels[3]!,
+    edgeCenterAlpha: pixels[Math.floor(height / 2) * stride + 3]!
   };
 };
 
@@ -164,7 +168,11 @@ describe('package metadata', () => {
     expect(packageJson.build.files).toContain('assets/logo/app-icon-windows.ico');
     expect(packageJson.build.mac.icon).toBe('assets/logo/app-icon-dark.svg');
     expect(packageJson.build.linux.icon).toBe('assets/logo/app-icon-dark.svg');
-    expect(read('assets/logo/app-icon-windows.svg')).toContain('scale(1.5)');
+    const windowsSvg = read('assets/logo/app-icon-windows.svg');
+    expect(windowsSvg).toContain(
+      '<rect x="0" y="0" width="1024" height="1024" rx="230" fill="#1b1b1f">'
+    );
+    expect(windowsSvg).toContain('scale(1.5)');
 
     const ico = readFileSync(path.resolve('assets/logo/app-icon-windows.ico'));
     expect(ico.readUInt16LE(0)).toBe(0);
@@ -196,7 +204,10 @@ describe('package metadata', () => {
     expect(taskbarPng).toBeDefined();
     const taskbar = readRgbaPngAlphaBounds(taskbarPng!);
     expect(taskbar).toMatchObject({ left: 0, top: 0, right: 24, bottom: 24 });
-    expect(taskbar.opaqueCoverage).toBeGreaterThanOrEqual(0.99);
+    expect(taskbar.cornerAlpha).toBeLessThan(16);
+    expect(taskbar.edgeCenterAlpha).toBeGreaterThanOrEqual(240);
+    expect(taskbar.opaqueCoverage).toBeGreaterThan(0.8);
+    expect(taskbar.opaqueCoverage).toBeLessThan(0.95);
   });
 });
 
