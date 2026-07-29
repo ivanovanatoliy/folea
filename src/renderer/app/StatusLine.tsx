@@ -1,6 +1,7 @@
 import { Show, createSignal, onCleanup, onMount } from 'solid-js';
 
 import type { ZoomState } from '../surface/zoom';
+import { getZoomStatusLabel } from './status-line-model';
 
 interface StatusLineProps {
   readonly version: string;
@@ -13,24 +14,9 @@ interface StatusLineProps {
   readonly configWarning?: string | undefined;
 }
 
-const formatZoom = (zoom: ZoomState): string => {
-  if (zoom.mode === 'fitWidth') {
-    return 'fit-w';
-  }
-
-  if (zoom.mode === 'fitContentWidth') {
-    return 'fit-c';
-  }
-
-  if (zoom.mode === 'fitPage') {
-    return 'fit-p';
-  }
-
-  return `${Math.round(zoom.level * 100)}%`;
-};
-
 export const StatusLine = (props: StatusLineProps) => {
   const [zoom, setZoom] = createSignal<ZoomState>({ level: 1, mode: 'fitWidth' });
+  const zoomStatusLabel = (): string | null => getZoomStatusLabel(zoom());
 
   onMount(() => {
     const handler = (event: Event): void => {
@@ -49,10 +35,12 @@ export const StatusLine = (props: StatusLineProps) => {
           {props.docName}
         </span>
       </Show>
-      <Show when={props.vaultStatus !== 'no vault'}>
-        <span class="statusline-zoom" data-testid="statusline-zoom">
-          [{formatZoom(zoom())}]
-        </span>
+      <Show when={props.vaultStatus !== 'no vault' && zoomStatusLabel()}>
+        {(label) => (
+          <span class="statusline-zoom" data-testid="statusline-zoom">
+            [{label()}]
+          </span>
+        )}
       </Show>
       <Show when={props.warmupMessage}>
         <span class="statusline-warmup" data-testid="statusline-warmup">

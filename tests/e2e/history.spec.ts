@@ -46,16 +46,28 @@ test('navigates backward and forward with exact reading locations', async () => 
     await expect(page.getByTestId('statusline-doc')).toHaveText('alpha.typ');
 
     await page.keyboard.press('+');
+    await expect(page.getByTestId('statusline-zoom')).toHaveCount(0);
     await page.keyboard.press('Space');
     await expect.poll(() => surface.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
     const alphaScrollTop = await surface.evaluate((element) => element.scrollTop);
-    const alphaZoom = await page.getByTestId('statusline-zoom').textContent();
+    const alphaZoomTransform = await page
+      .getByTestId('typst-rendered-document')
+      .locator('svg')
+      .evaluate((element) => element.style.transform);
 
     await openTreeNote(page, 'beta.typ');
     await page.keyboard.press('Backspace');
     await expect(page.getByTestId('statusline-doc')).toHaveText('alpha.typ');
     await expectSurfaceRendered(page);
-    await expect(page.getByTestId('statusline-zoom')).toHaveText(alphaZoom ?? '');
+    await expect(page.getByTestId('statusline-zoom')).toHaveCount(0);
+    await expect
+      .poll(() =>
+        page
+          .getByTestId('typst-rendered-document')
+          .locator('svg')
+          .evaluate((element) => element.style.transform)
+      )
+      .toBe(alphaZoomTransform);
     await expect
       .poll(() =>
         surface.evaluate(
