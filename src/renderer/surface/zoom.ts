@@ -54,6 +54,8 @@ export const createZoomController = (container: HTMLElement): ZoomController => 
     }
 
     const previousWidth = _documentNode.offsetWidth || parseFloat(_documentNode.style.width) || 0;
+    const previousHeight =
+      parseFloat(_documentNode.style.minHeight) || _documentNode.offsetHeight || 0;
     const containerRect = container.getBoundingClientRect();
     const documentRect = _documentNode.getBoundingClientRect();
     const centerRatio = getHorizontalCenterRatio({
@@ -61,6 +63,12 @@ export const createZoomController = (container: HTMLElement): ZoomController => 
       contentLeft: documentRect.left,
       contentWidth: previousWidth
     });
+    const viewportTopRatio = getVerticalViewportRatio({
+      viewportTop: containerRect.top,
+      contentTop: documentRect.top,
+      contentHeight: previousHeight
+    });
+    const contentOffsetTop = documentRect.top - containerRect.top + container.scrollTop;
     const appliedLevel = snapScaleToDevicePixels(_level);
     const style = getComputedStyle(container);
     const paddingLeft = parseFloat(style.paddingLeft);
@@ -86,6 +94,11 @@ export const createZoomController = (container: HTMLElement): ZoomController => 
       centerRatio,
       viewportWidth: container.clientWidth,
       contentWidth: width
+    });
+    container.scrollTop = getScrollTopForVerticalViewport({
+      viewportTopRatio,
+      contentOffsetTop,
+      contentHeight: height
     });
 
     window.dispatchEvent(
@@ -226,6 +239,37 @@ export const getScrollLeftForHorizontalCenter = ({
   const next = contentWidth * centerRatio - viewportWidth / 2;
   return Math.max(0, Math.min(maxScrollLeft, Math.round(next)));
 };
+
+export interface VerticalViewportRatioInput {
+  readonly viewportTop: number;
+  readonly contentTop: number;
+  readonly contentHeight: number;
+}
+
+export const getVerticalViewportRatio = ({
+  viewportTop,
+  contentTop,
+  contentHeight
+}: VerticalViewportRatioInput): number => {
+  if (contentHeight <= 0) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(1, (viewportTop - contentTop) / contentHeight));
+};
+
+export interface VerticalViewportScrollInput {
+  readonly viewportTopRatio: number;
+  readonly contentOffsetTop: number;
+  readonly contentHeight: number;
+}
+
+export const getScrollTopForVerticalViewport = ({
+  viewportTopRatio,
+  contentOffsetTop,
+  contentHeight
+}: VerticalViewportScrollInput): number =>
+  Math.max(0, Math.round(contentOffsetTop + contentHeight * viewportTopRatio));
 
 export interface ContentBounds {
   readonly x: number;

@@ -645,6 +645,14 @@ describe('headless dispatch — document commands', () => {
     expect(scrollByLines).toHaveBeenCalledWith(-1);
   });
 
+  it('ArrowDown and ArrowUp scroll by lines in document context', () => {
+    const { scrollByLines, dispatcher } = makeSetup();
+    expect(dispatcher.dispatch('ArrowDown')).toBe('handled');
+    expect(dispatcher.dispatch('ArrowUp')).toBe('handled');
+    expect(scrollByLines).toHaveBeenNthCalledWith(1, 1);
+    expect(scrollByLines).toHaveBeenNthCalledWith(2, -1);
+  });
+
   it('h/l → horizontal scrolling commands', () => {
     const { scrollLeft, scrollRight, dispatcher } = makeSetup();
     expect(dispatcher.dispatch('h')).toBe('handled');

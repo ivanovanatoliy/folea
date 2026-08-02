@@ -414,6 +414,17 @@ test('scrolls the document with Space and Shift+Space', async () => {
     await expectSurfaceRendered(page);
     await expect.poll(() => surface.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
 
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(() => surface.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+    const scrollTopAfterArrowDown = await surface.evaluate((el) => el.scrollTop);
+    await page.keyboard.press('ArrowUp');
+    await expect
+      .poll(() => surface.evaluate((el) => el.scrollTop))
+      .toBeLessThan(scrollTopAfterArrowDown);
+    await page.keyboard.press('g');
+    await page.keyboard.press('g');
+    await expect.poll(() => surface.evaluate((el) => el.scrollTop)).toBeLessThanOrEqual(1);
+
     await page.keyboard.press('Space');
     await expect.poll(() => surface.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
     const scrollTopAfterSpace = await surface.evaluate((el) => el.scrollTop);

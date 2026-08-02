@@ -5,6 +5,8 @@ export const DOCUMENT_KEYMAP: Keymap = new Map([
   ['<S-Backspace>', 'document.historyForward'],
   ['j', 'document.scrollLineDown'],
   ['k', 'document.scrollLineUp'],
+  ['ArrowDown', 'document.scrollLineDown'],
+  ['ArrowUp', 'document.scrollLineUp'],
   ['h', 'document.scrollLeft'],
   ['l', 'document.scrollRight'],
   ['<C-d>', 'document.scrollHalfDown'],

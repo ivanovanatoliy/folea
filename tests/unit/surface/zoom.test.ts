@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createZoomController,
   getHorizontalCenterRatio,
-  getScrollLeftForHorizontalCenter
+  getScrollLeftForHorizontalCenter,
+  getScrollTopForVerticalViewport,
+  getVerticalViewportRatio
 } from '../../../src/renderer/surface/zoom';
 
 type FakeStyle = Record<string, string>;
@@ -26,7 +28,12 @@ type FakeElement = {
   };
   readonly closest?: () => FakeElement | null;
   readonly getAttribute?: () => string | null;
-  readonly getBoundingClientRect: () => { readonly left: number; readonly width: number };
+  readonly getBoundingClientRect: () => {
+    readonly left: number;
+    readonly top: number;
+    readonly width: number;
+    readonly height: number;
+  };
   readonly querySelectorAll?: () => readonly FakeElement[];
 };
 
@@ -42,7 +49,7 @@ const makeElement = (
   clientHeight,
   closest: () => null,
   getAttribute: () => null,
-  getBoundingClientRect: () => ({ left, width: clientWidth }),
+  getBoundingClientRect: () => ({ left, top: 0, width: clientWidth, height: clientHeight }),
   querySelectorAll: () => children
 });
 
@@ -58,7 +65,7 @@ const makeSvgGraphic = (
   getBBox: () => bbox,
   closest: () => null,
   getAttribute: () => null,
-  getBoundingClientRect: () => ({ left: 0, width: bbox.width }),
+  getBoundingClientRect: () => ({ left: 0, top: 0, width: bbox.width, height: bbox.height }),
   querySelectorAll: () => []
 });
 
@@ -107,6 +114,23 @@ describe('zoom controller', () => {
         contentWidth: 1500
       })
     ).toBe(125);
+  });
+
+  it('preserves the document point at the top of the viewport across height changes', () => {
+    const viewportTopRatio = getVerticalViewportRatio({
+      viewportTop: 100,
+      contentTop: -400,
+      contentHeight: 2000
+    });
+
+    expect(viewportTopRatio).toBe(0.25);
+    expect(
+      getScrollTopForVerticalViewport({
+        viewportTopRatio,
+        contentOffsetTop: 28,
+        contentHeight: 3000
+      })
+    ).toBe(778);
   });
 
   it('fitWidth subtracts surface padding and snaps scale to device pixels', () => {

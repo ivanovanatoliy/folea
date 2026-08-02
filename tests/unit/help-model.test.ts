@@ -90,7 +90,7 @@ describe('keyboard help model', () => {
       .flatMap((group) => group.rows)
       .find((candidate) => candidate.commandId === 'document.scrollLineDown');
 
-    expect(row?.bindings).toEqual(['F8']);
+    expect(row?.bindings).toEqual(['↓', 'F8']);
   });
 
   it('merges global shortcuts into each context and lets local chords win', () => {
