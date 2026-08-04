@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { clearRenderCache } from '../../src/main/vault-state';
+import { clearRenderCache, readRenderCache, writeRenderCache } from '../../src/main/vault-state';
 
 const roots: string[] = [];
 
@@ -37,5 +37,44 @@ describe('vault render cache clearing', () => {
     roots.push(vaultRoot);
 
     await expect(clearRenderCache(vaultRoot)).resolves.toBeUndefined();
+  });
+
+  it('rejects cache entries created before physical page metadata was stored', async () => {
+    const vaultRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'folea-vault-cache-version-'));
+    roots.push(vaultRoot);
+    const cacheKey = `${'a'.repeat(64)}:typst.ts@0.7.0`;
+
+    await writeRenderCache(vaultRoot, {
+      manifestEntry: {
+        cacheKey,
+        relPath: 'note.typ',
+        entryPath: `${cacheKey}.json`,
+        rendererVersion: '1',
+        compilerVersion: 'typst.ts@0.7.0',
+        inputHash: '',
+        inputFiles: [],
+        createdAt: '2026-08-04T00:00:00.000Z',
+        lastUsedAt: '2026-08-04T00:00:00.000Z',
+        byteSize: 1
+      },
+      entry: {
+        schemaVersion: 1,
+        cacheKey,
+        relPath: 'note.typ',
+        artifact: { svg: '<svg xmlns="http://www.w3.org/2000/svg"/>', width: 100, height: 300 },
+        textLayer: {
+          version: 1,
+          text: '',
+          spans: [],
+          pages: [{ page: 0, width: 100, height: 300 }]
+        },
+        outline: []
+      }
+    });
+
+    await expect(readRenderCache(vaultRoot, { relPath: 'note.typ' })).resolves.toEqual({
+      hit: false,
+      reason: 'version-mismatch'
+    });
   });
 });

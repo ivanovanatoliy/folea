@@ -4,6 +4,7 @@ export interface SurfacePageStatus {
 }
 
 export interface SurfaceScrollController {
+  setPageCount(total: number): void;
   emitStatus(): void;
   dispose(): void;
   byLines(lines: number): void;
@@ -21,10 +22,12 @@ const HORIZONTAL_SCROLL_PX = 80;
 export const calculatePageStatus = (
   clientHeight: number,
   scrollHeight: number,
-  scrollTop: number
+  scrollTop: number,
+  physicalPageCount: number
 ): SurfacePageStatus => {
-  if (clientHeight <= 0 || scrollHeight <= 0) return { current: 0, total: 0 };
-  const total = Math.max(1, Math.ceil(scrollHeight / clientHeight));
+  const total = Math.max(0, Math.floor(physicalPageCount));
+  if (total === 0) return { current: 0, total: 0 };
+  if (clientHeight <= 0 || scrollHeight <= 0) return { current: 1, total };
   const maxScrollTop = Math.max(0, scrollHeight - clientHeight);
   const current =
     maxScrollTop === 0
@@ -35,19 +38,24 @@ export const calculatePageStatus = (
 
 export const createSurfaceScroll = (container: HTMLElement): SurfaceScrollController => {
   let frame: number | undefined;
+  let physicalPageCount = 0;
+  const dispatchStatus = (): void => {
+    window.dispatchEvent(
+      new CustomEvent<SurfacePageStatus>('folea:surface-page-status', {
+        detail: calculatePageStatus(
+          container.clientHeight,
+          container.scrollHeight,
+          container.scrollTop,
+          physicalPageCount
+        )
+      })
+    );
+  };
   const emitStatus = (): void => {
     if (frame !== undefined) return;
     frame = requestAnimationFrame(() => {
       frame = undefined;
-      window.dispatchEvent(
-        new CustomEvent<SurfacePageStatus>('folea:surface-page-status', {
-          detail: calculatePageStatus(
-            container.clientHeight,
-            container.scrollHeight,
-            container.scrollTop
-          )
-        })
-      );
+      dispatchStatus();
     });
   };
   const update = (mutation: () => void): void => {
@@ -56,6 +64,12 @@ export const createSurfaceScroll = (container: HTMLElement): SurfaceScrollContro
   };
 
   return {
+    setPageCount(total): void {
+      physicalPageCount = Math.max(0, Math.floor(total));
+      // Page metadata arrives at render completion and must be observable even
+      // when animation frames are throttled (for example in a hidden window).
+      dispatchStatus();
+    },
     emitStatus,
     dispose(): void {
       if (frame !== undefined) cancelAnimationFrame(frame);

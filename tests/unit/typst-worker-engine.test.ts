@@ -238,6 +238,21 @@ describe('typst worker engine integration', () => {
     expect(withNewCm.artifact.svg).not.toBe(withoutNewCm.artifact.svg);
   }, 20_000);
 
+  it('reports the physical pages produced by Typst', async () => {
+    const output = await (
+      await getEngine()
+    ).compile({
+      mainPath: 'pages.typ',
+      source: '= First\n\n#pagebreak()\n\n= Second\n\n#pagebreak()\n\n= Third\n'
+    });
+
+    expect(output.type).toBe('rendered');
+    if (output.type !== 'rendered') return;
+    expect(output.textLayer.pages).toHaveLength(3);
+    expect(output.textLayer.pages.map((page) => page.page)).toEqual([0, 1, 2]);
+    expect(output.textLayer.pages.every((page) => page.width > 0 && page.height > 0)).toBe(true);
+  }, 20_000);
+
   it('returns diagnostics for broken Typst source', async () => {
     const output = await (
       await getEngine()

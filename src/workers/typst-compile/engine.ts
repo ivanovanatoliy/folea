@@ -293,6 +293,16 @@ export const createTypstEngine = async (
       try {
         const width = Math.ceil(session.doc_width);
         const height = Math.ceil(session.doc_height);
+        const pagesInfo = session.pages_info;
+        const pages = Array.from({ length: pagesInfo.page_count }, (_, page) => {
+          const info = pagesInfo.page(page);
+          try {
+            return { page, width: info.width_pt, height: info.height_pt };
+          } finally {
+            info.free();
+          }
+        });
+        pagesInfo.free();
         const svg = renderer.svg_data(session, SVG_BODY_DEFS_CSS);
         const artifact: RenderArtifact = { svg, width, height };
         const outline = extractOutlineEntries(compiler.query(mainFilePath, null, 'heading'), svg);
@@ -300,7 +310,7 @@ export const createTypstEngine = async (
         return {
           type: 'rendered',
           artifact,
-          textLayer: extractTextLayerModel(svg, artifact),
+          textLayer: extractTextLayerModel(svg, artifact, pages),
           outline,
           dependencies: [...accessModel.dependencyPaths]
             .map(fromVirtualTypstPath)

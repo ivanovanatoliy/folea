@@ -89,3 +89,29 @@ test('shows fit modes and hides the manual zoom status', async () => {
     await fs.rm(vaultRoot, { recursive: true, force: true });
   }
 });
+
+test('keeps the Typst physical page count while zooming', async () => {
+  const vaultRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'folea-e2e-page-count-'));
+  await fs.writeFile(
+    path.join(vaultRoot, 'note.typ'),
+    '= First page\n\n#pagebreak()\n\n= Second page\n\n#pagebreak()\n\n= Third page\n'
+  );
+
+  try {
+    const app = await launchApp({
+      ...currentEnv(),
+      FOLEA_ALLOW_TEST_VAULT_OPEN: '1',
+      FOLEA_TEST_VAULT_PATH: vaultRoot
+    });
+    const page = await app.firstWindow();
+    await expectSurfaceRendered(page);
+
+    await expect(page.getByTestId('statusline-page')).toHaveText('[1/3]');
+    await page.keyboard.press('+');
+    await expect(page.getByTestId('statusline-page')).toHaveText('[1/3]');
+    await page.keyboard.press('-');
+    await expect(page.getByTestId('statusline-page')).toHaveText('[1/3]');
+  } finally {
+    await fs.rm(vaultRoot, { recursive: true, force: true });
+  }
+});

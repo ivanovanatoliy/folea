@@ -167,6 +167,7 @@ export const createSurface = (
     container.dataset.durationMs = String(durationMs);
     latestOutline = result.outline;
     latestTextLayer = result.textLayer;
+    scroll.setPageCount(result.textLayer.pages.length);
     caretEngine.setTextLayer(result.textLayer, container, latestNoteId);
     search.clearHighlight();
     zoomController.setArtifact(
@@ -374,6 +375,7 @@ export const createSurface = (
         container.dataset.durationMs = '0';
         latestOutline = entry.outline;
         latestTextLayer = entry.textLayer;
+        scroll.setPageCount(entry.textLayer.pages.length);
         caretEngine.setTextLayer(entry.textLayer, container, noteId);
         search.clearHighlight();
         zoomController.setArtifact(

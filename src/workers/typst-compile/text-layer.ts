@@ -1,13 +1,17 @@
-import type { RenderArtifact, TextLayerModel } from '../../shared/worker/typst';
+import type { RenderArtifact, TextLayerModel, TextLayerPage } from '../../shared/worker/typst';
 
-export const extractTextLayerModel = (svg: string, artifact: RenderArtifact): TextLayerModel => {
+export const extractTextLayerModel = (
+  svg: string,
+  artifact: RenderArtifact,
+  pages: readonly TextLayerPage[] = [{ page: 0, width: artifact.width, height: artifact.height }]
+): TextLayerModel => {
   const text = extractTextLayerText(svg);
 
   return {
     version: 1,
     text,
     spans: [],
-    pages: [{ page: 0, width: artifact.width, height: artifact.height }]
+    pages
   };
 };
 
